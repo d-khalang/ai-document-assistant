@@ -155,3 +155,27 @@ def log_alert_result(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (log_id, deadline_id, due_date, threshold_days, channel, recipient, status, error))
         conn.commit()
+
+def deactivate_deadlines_for_document(source_document: str) -> int:
+    """غیرفعال کردن تمام سررسیدهای سندی که حذف شده است."""
+    with get_connection() as conn:
+        cur = conn.execute("UPDATE deadlines SET active = 0 WHERE active = 1 AND source_document = ?", (source_document,))
+        conn.commit()
+        return cur.rowcount
+
+def deactivate_missing_deadlines(keep_ids, source_documents) -> int:
+    """غیرفعال کردن سررسیدهای تغییریافته یا حذف‌شده."""
+    docs = list(source_documents)
+    if not docs:
+        return 0
+    keep = list(keep_ids)
+    q_docs = ",".join("?" * len(docs))
+    sql = f"UPDATE deadlines SET active = 0 WHERE active = 1 AND source_document IN ({q_docs})"
+    params = docs
+    if keep:
+        sql += f" AND id NOT IN ({','.join('?' * len(keep))})"
+        params = docs + keep
+    with get_connection() as conn:
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.rowcount

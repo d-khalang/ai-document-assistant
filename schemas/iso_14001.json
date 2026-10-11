@@ -19,6 +19,10 @@
     "scadenziario": {
       "label": "Scadenziario adempimenti",
       "description": "Adempimenti, prescrizioni normative, autorizzazioni ambientali e visite mediche.",
+      "routing": {
+          "strong_keywords": ["scadenziario", "adempimenti", "prescrizioni", "iso 14001", "sga"],
+          "keywords": ["scadenza", "responsabile", "rifiuti", "emissioni", "ppga", "visita medica", "autorizzazion*"]
+        },
       "fields": {
         "tema": {"type": "string", "label": "Tema / Area", "description": "es. Gestione Rifiuti, Emissioni, PPGA, Salute e Sicurezza"},
         "adempimento": {"type": "string", "label": "Adempimento / Descrizione", "required": true, "description": "Descrizione sintetica dell'obbligo o della prescrizione"},
@@ -33,6 +37,10 @@
     "vehicle_fuel": {
       "label": "Parco veicoli e consumi",
       "description": "Monitoraggio veicoli, carburante e scadenze revisioni periodiche.",
+      "routing": {
+          "strong_keywords": ["parco veicoli", "revisione", "consumo carburante"],
+          "keywords": ["targa", "km percorsi", "chilometri", "litri", "veicol*", "mezzo", "modello"]
+        },
       "fields": {
         "targa": {"type": "plate", "label": "Targa Mezzo", "required": true, "description": "Targa del veicolo es. AA123BB"},
         "modello": {"type": "string", "label": "Modello / Descrizione", "description": "Marca e modello veicolo"},
@@ -48,6 +56,10 @@
     "utility_consumption": {
       "label": "Consumi Utenze e Risorse",
       "description": "Monitoraggio consumi energia elettrica, acqua industriale, gas naturale.",
+      "routing": {
+          "strong_keywords": ["pod", "pdr", "kwh", "smc", "contatore", "consumi"],
+          "keywords": ["fornitore", "acqua", "gas", "fasce", "f1", "f2", "f3", "periodo fatturato", "energia elettrica"]
+        },
       "fields": {
         "tipo_utenza": {"type": "string", "label": "Tipo Utenza", "required": true, "description": "Elettricità, Acqua, Gas"},
         "fornitore": {"type": "string", "label": "Fornitore / Gestore", "description": "Ragione sociale fornitore"},
@@ -62,6 +74,10 @@
     "personnel_training": {
       "label": "Formazione e Abilitazioni Personale",
       "description": "Registro formazione obbligatoria D.Lgs 81/08 e abilitazioni macchinari.",
+      "routing": {
+          "strong_keywords": ["attest*", "corso di formazione", "81/08", "ente formatore"],
+          "keywords": ["aggiornament*", "rspp", "antincendio", "primo soccorso", "carrellist*", "lavorator*", "ore di formazione", "rlsr", "abilitazion*"]
+        },
       "fields": {
         "nominativo_dipendente": {"type": "string", "label": "Dipendente / Collaboratore", "required": true, "description": "Nome e cognome lavoratore"},
         "codice_fiscale": {"type": "string", "label": "Codice Fiscale", "description": "Codice Fiscale lavoratore"},
@@ -79,6 +95,10 @@
     "regulatory_authorization": {
       "label": "Autorizzazioni e Titoli Abilitativi",
       "description": "Autorizzazioni ambientali, iscrizioni Albo Gestori e codici EER.",
+      "routing": {
+          "strong_keywords": ["autorizzazion*", "albo gestori", "codice eer", "iscrizione albo", "provvediment*"],
+          "keywords": ["rifiuti", "categoria", "r13", "provincia", "regione", "prescrizioni", "garanzie finanziarie", "mezzi autorizzati", "responsabile tecnico"]
+        },
       "fields": {
         "numero_atto_protocollo": {"type": "string", "label": "N. Atto / Protocollo", "required": true, "description": "Numero identificativo autorizzazione"},
         "numero_iscrizione": {"type": "string", "label": "N. Iscrizione Albo / Registro", "description": "Numero iscrizione Albo es. TO15878"},

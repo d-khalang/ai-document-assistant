@@ -42,6 +42,10 @@ class SmtpEmailNotifier:
                 s.login(self.user, self.password)
             s.send_message(msg)
 
+    @property
+    def configured(self) -> bool:
+        return bool(self.host) and self.host != "localhost"
+
 
 class TwilioSmsNotifier:
     channel = "sms"
@@ -64,3 +68,7 @@ class TwilioSmsNotifier:
         auth_header = base64.b64encode(f"{self.sid}:{self.token}".encode("utf-8")).decode("utf-8")
         req.add_header("Authorization", f"Basic {auth_header}")
         urllib.request.urlopen(req, timeout=15).read()
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.sid and self.token and self.sender)

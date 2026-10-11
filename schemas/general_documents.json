@@ -18,6 +18,10 @@
     "general": {
       "label": "Documento Generale",
       "description": "Estrazione generale per contratti, comunicazioni istituzionali e documentazione varia.",
+      "routing": {
+        "fallback": true,
+        "keywords": ["contratto", "contratti", "convenzione", "accordo quadro", "lettera di incarico", "polizza", "delibera", "capitolato", "comunicazione", "protocollo"]
+      },
       "fields": {
         "titolo_documento": {"type": "string", "label": "Titolo Documento", "required": true, "description": "Titolo o oggetto principale"},
         "ente_emittente": {"type": "string", "label": "Ente Emittente", "description": "Azienda o ente emittente"},

@@ -44,6 +44,7 @@ class SchemaDef:
     description: str
     fields: Dict[str, FieldDef]
     computed: Dict[str, ComputedDef] = field(default_factory=dict)
+    routing: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def required(self) -> List[str]:
@@ -108,8 +109,12 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         computed[cname] = ComputedDef(cname, op, inputs, cr.get("label") or cname,
                                       float(cr.get("scale", 1)), int(cr.get("decimals", 2)), cr.get("unit", ""))
 
-    return SchemaDef(name, module_id, raw.get("label") or name, raw.get("description", ""), fields, computed)
+    routing = raw.get("routing") or {}
+    for key in ("keywords", "strong_keywords"):
+        if not all(isinstance(k, str) for k in routing.get(key, [])):
+            raise ValueError(f"{src}: {name}.routing.{key} must be a list of strings")
 
+    return SchemaDef(name, module_id, raw.get("label") or name, raw.get("description", ""), fields, computed, routing)
 
 @lru_cache(maxsize=1)
 def load_registry() -> Dict[str, ModuleDef]:

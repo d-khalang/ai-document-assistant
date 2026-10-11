@@ -19,6 +19,10 @@
     "maintenance_log": {
       "label": "Interventi e Verifiche Macchinari",
       "description": "Estrazione verbali di collaudo, manutenzioni ordinarie/straordinarie, verifiche periodiche e contratti d'assistenza.",
+      "routing": {
+        "strong_keywords": ["manutenzion*", "collaudo", "verbale di intervento", "verifica periodica", "rapporto di intervento", "matricola"],
+        "keywords": ["macchin*", "impianto", "assistenza", "intervento", "tecnico", "prossima verifica", "attrezzatur*"]
+      },
       "fields": {
         "macchinario_asset": {
           "type": "string",

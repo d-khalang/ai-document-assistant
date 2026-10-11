@@ -38,24 +38,35 @@ def get_batch_embeddings(texts: List[str], model: str = GEMINI_EMBEDDING_MODEL) 
         return []
 
     keys = get_api_keys()
-    last_error = ""
+    batch_size = 90  # ارسال در دسته‌های ۹۰تایی جهت رعایت محدودیت ۱۰۰تایی API
+    all_embeddings: List[List[float]] = []
 
-    for idx, key in enumerate(keys):
-        try:
-            client = genai.Client(api_key=key)
-            response = client.models.embed_content(
-                model=model,
-                contents=texts,
-            )
-            if not response.embeddings:
-                raise ValueError("No embeddings returned by the API.")
-            return [list(emb.values) for emb in response.embeddings]
-        except APIError as e:
-            last_error = e.message
-            if any(term in str(e).lower() for term in ["429", "503", "quota", "resource_exhausted"]) and idx < len(keys) - 1:
-                continue
-            raise RuntimeError(f"Gemini Batch Embedding API Error: {e.message}")
-        except Exception as e:
-            raise RuntimeError(f"Unexpected error during batch embedding generation: {str(e)}")
+    for i in range(0, len(texts), batch_size):
+        sub_batch = texts[i:i + batch_size]
+        last_error = ""
+        batch_success = False
 
-    raise RuntimeError(f"All API keys rate-limited during batch embedding. Last error: {last_error}")
+        for idx, key in enumerate(keys):
+            try:
+                client = genai.Client(api_key=key)
+                response = client.models.embed_content(
+                    model=model,
+                    contents=sub_batch,
+                )
+                if not response.embeddings:
+                    raise ValueError("No embeddings returned by the API.")
+                all_embeddings.extend([list(emb.values) for emb in response.embeddings])
+                batch_success = True
+                break
+            except APIError as e:
+                last_error = e.message
+                if any(term in str(e).lower() for term in ["429", "503", "quota", "resource_exhausted"]) and idx < len(keys) - 1:
+                    continue
+                raise RuntimeError(f"Gemini Batch Embedding API Error: {e.message}")
+            except Exception as e:
+                raise RuntimeError(f"Unexpected error during batch embedding generation: {str(e)}")
+
+        if not batch_success:
+            raise RuntimeError(f"All API keys rate-limited during batch embedding. Last error: {last_error}")
+
+    return all_embeddings

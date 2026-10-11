@@ -19,6 +19,10 @@
     "training_certificate": {
       "label": "Attestati di Formazione",
       "description": "Estrazione analitica di certificati di formazione, abilitazioni e date di scadenza aggiornamento per dipendente.",
+      "routing": {
+        "strong_keywords": ["attest*", "corso di formazione", "81/08", "ente formatore"],
+        "keywords": ["aggiornament*", "rspp", "antincendio", "primo soccorso", "carrellist*", "lavorator*", "ore di formazione", "rlsr", "abilitazion*"]
+      },
       "fields": {
         "nominativo_dipendente": {
           "type": "string",

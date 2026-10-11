@@ -19,6 +19,10 @@
     "energy_bill": {
       "label": "Fatture e Bollette Elettriche",
       "description": "Estrazione analitica di consumi elettrici (kWh), codice POD, costi complessivi e calcolo automatico del costo unitario (€/kWh).",
+      "routing": {
+        "strong_keywords": ["bolletta", "pod", "kwh", "energia elettrica", "fattura di energia", "eviso", "enel"],
+        "keywords": ["consumo", "periodo fatturato", "totale da pagare", "potenza impegnata", "oneri di sistema", "fornitura"]
+      },
       "fields": {
         "fornitore": {
           "type": "string",

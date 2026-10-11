@@ -18,6 +18,10 @@
     "fuel_expense": {
       "label": "Rifornimenti Carburante",
       "description": "Rifornimenti e spese carburante per singolo automezzo.",
+      "routing": {
+        "strong_keywords": ["carburante", "rifornimento", "gasolio", "fuel card", "distributore"],
+        "keywords": ["targa", "litri", "importo", "chilometri", "benzina", "scontrino"]
+      },
       "fields": {
         "targa": {"type": "plate", "label": "Targa", "required": true, "description": "Targa del mezzo"},
         "data_rifornimento": {"type": "date", "label": "Data Rifornimento", "description": "Data del rifornimento"},

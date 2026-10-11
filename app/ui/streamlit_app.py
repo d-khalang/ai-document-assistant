@@ -19,8 +19,14 @@ from app.alerts.store import (
     get_active_recipients
 )
 from app.alerts.scanner import scan_deadlines
+from app.alerts.store import deactivate_deadlines_for_document
+from app.extraction.pipeline import (
+    apply_results, build_routing_plan, collect_errors, collect_payload, evict_document,
+    pending_tasks, run_batch_extraction, sync_deadlines_to_db,
+)
 from app.alerts.deadlines import extract_deadlines_from_records
 from app.alerts.dispatcher import dispatch_alerts
+from app.reporting.platform_excel_exporter import create_platform_excel_report
 
 from app.ai.gemini import generate_answer
 from app.ai.prompts import build_rag_prompt
@@ -76,6 +82,10 @@ def initialize_session():
     st.session_state.setdefault("reviewed_data", {})
     st.session_state.setdefault("editor_version", {})
     st.session_state.setdefault("export_fields", {})
+    st.session_state.setdefault("routing_plan", {})       # doc -> RouteDecision (automatic)
+    st.session_state.setdefault("routing_overrides", {})  # doc -> (mid, schema) | None (user choice)
+    st.session_state.setdefault("routed_to", {})          # doc -> route actually extracted
+    st.session_state.setdefault("platform_xlsx", None)    # (bytes, datetime)
 
     # در شروع هر بار باز شدن وب‌اپ، اطلاعات شرکت کاملاً خالی است تا کاربر خودش پر کند
     if "company_profile" not in st.session_state:
@@ -132,6 +142,124 @@ def build_export_payload(mid: str) -> Dict[str, Any]:
         recs = reviewed if reviewed is not None else res.get("records", [])
         out[s_name] = {**res, "records": recs, "total_records": len(recs)}
     return out
+
+
+EXCLUDE_LABEL = "— Escludi dall'analisi —"
+
+
+def _route_labels() -> Dict[Any, str]:
+    out = {}
+    for m in list_modules():
+        short = m.label.split("—")[0].strip()
+        for sname, s in m.schemas.items():
+            out[(m.module_id, sname)] = f"{short} › {s.label} ({sname})"
+    return out
+
+
+def _build_platform_report(labels: Dict[Any, str], effective: Dict[str, Any]) -> None:
+    ss = st.session_state
+    ss.platform_xlsx = (
+        create_platform_excel_report(
+            documents=[{"filename": n} for n in ss.indexed_documents],
+            extracted_data_all_modules=collect_payload(ss.extracted_data, ss.reviewed_data),
+            company_profile=ss.company_profile,
+            routing={d: labels[r] for d, r in effective.items() if r in labels},
+            errors=collect_errors(ss.extracted_data),
+        ),
+        datetime.now(),
+    )
+
+
+def render_platform_pipeline(preferred_module: str) -> None:
+    """One-click flow: deterministic routing -> parallel extraction -> deadline sync -> executive report."""
+    ss = st.session_state
+    docs = ss.indexed_documents
+    labels = _route_labels()
+    by_label = {v: k for k, v in labels.items()}
+
+    with st.expander("🚀 Analisi Automatica Piattaforma (Routing + Estrazione + Fascicolo)", expanded=True):
+        st.caption("I documenti vengono assegnati in modo deterministico al modulo/schema più adatto "
+                   "(regole in schemas/*.json). Puoi correggere l'instradamento prima di avviare.")
+
+        new_docs = {n: m["pages"] for n, m in docs.items() if n not in ss.routing_plan}
+        if new_docs:
+            ss.routing_plan.update(build_routing_plan(new_docs, preferred_module))
+
+        rows = []
+        for name in docs:
+            dec = ss.routing_plan[name]
+            route = ss.routing_overrides.get(name, dec.route)
+            rows.append({"Documento": name, "Instradamento": labels.get(route, EXCLUDE_LABEL),
+                         "Score": round(dec.score, 1), "Esito": dec.reason})
+
+        edited = st.data_editor(
+            pd.DataFrame(rows), hide_index=True, use_container_width=True,
+            key=f"routing_editor_{abs(hash(tuple(docs)))}",
+            column_config={"Instradamento": st.column_config.SelectboxColumn(
+                options=[EXCLUDE_LABEL] + list(by_label), required=True)},
+            disabled=["Documento", "Score", "Esito"],
+        )
+
+        effective: Dict[str, Any] = {}
+        for _, row in edited.iterrows():
+            name, route = row["Documento"], by_label.get(row["Instradamento"])
+            effective[name] = route
+            if route != ss.routing_plan[name].route:
+                ss.routing_overrides[name] = route
+            else:
+                ss.routing_overrides.pop(name, None)
+
+        c_run, c_rebuild = st.columns(2)
+        run = c_run.button("▶️ Esegui analisi completa", type="primary", use_container_width=True,
+                           help="Estrae solo i documenti non ancora analizzati, sincronizza le scadenze e genera il fascicolo.")
+        rebuild = c_rebuild.button("📊 Rigenera solo il fascicolo", use_container_width=True,
+                                   help="Ricostruisce l'Excel includendo le modifiche fatte nella griglia di revisione.")
+
+        if run:
+            # documents re-routed by the user: drop their records from the previous schema
+            for doc, route in effective.items():
+                old = ss.routed_to.get(doc)
+                if old and old != route:
+                    evict_document(ss.extracted_data, ss.reviewed_data, ss.editor_version, doc, only_route=old)
+                    ss.routed_to.pop(doc, None)
+
+            tasks = pending_tasks(effective, ss.extracted_data)
+            pages_by_doc = {n: m["pages"] for n, m in docs.items()}
+            failures = {}
+            if tasks:
+                with st.status(f"Estrazione in corso: {len(tasks)} operazioni…", expanded=True) as status:
+                    bar = st.progress(0.0)
+
+                    def on_progress(done, total, doc, sname, err):  # runs in the script thread
+                        bar.progress(done / total)
+                        st.write(f"{'✗' if err else '✓'} **{doc}** → `{sname}`" + (f" — {err}" if err else ""))
+                        if err:
+                            failures[doc] = err
+
+                    results = run_batch_extraction(tasks, pages_by_doc, max_workers=3, on_progress=on_progress)
+                    apply_results(ss.extracted_data, ss.reviewed_data, ss.editor_version, ss.routed_to, results)
+                    status.update(label=f"Estrazione completata ({len(tasks) - len(failures)}/{len(tasks)} OK)",
+                                  state="complete" if not failures else "error", expanded=bool(failures))
+            else:
+                st.info("Nessun documento nuovo da analizzare.")
+
+            payload = collect_payload(ss.extracted_data, ss.reviewed_data)
+            n_dl = sync_deadlines_to_db(payload, docs.keys())
+            _build_platform_report(labels, effective)
+            st.success(f"Fascicolo pronto · {n_dl} scadenze sincronizzate per il monitoraggio.")
+        elif rebuild:
+            sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), docs.keys())
+            _build_platform_report(labels, effective)
+
+        if ss.platform_xlsx:
+            data, ts = ss.platform_xlsx
+            st.download_button(
+                label=f"📥 Scarica Fascicolo Gestionale Completo (.xlsx) — generato {ts:%H:%M:%S}",
+                data=data,
+                file_name=f"Report_Gestionale_Completo_{ts:%Y%m%d_%H%M}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
 
 
 def render_ui():
@@ -259,6 +387,12 @@ def render_ui():
                 remove_document_from_chromadb(existing_name)
                 del st.session_state.indexed_documents[existing_name]
                 st.session_state.processing_errors.pop(existing_name, None)
+                evict_document(st.session_state.extracted_data, st.session_state.reviewed_data,
+                               st.session_state.editor_version, existing_name)
+                deactivate_deadlines_for_document(existing_name)
+                for key in ("routing_plan", "routing_overrides", "routed_to"):
+                    st.session_state[key].pop(existing_name, None)
+                st.session_state.platform_xlsx = None
 
         if not current_filenames and indexed_names:
             reset_conversation()
@@ -289,7 +423,9 @@ def render_ui():
             st.session_state.processing_errors = {}
 
         if st.session_state.indexed_documents:
-            st.success(f"Archivio attivo: {len(st.session_state.indexed_documents)} documenti pronti per RAG ed استrazione.")
+            st.success(f"Archivio attivo: {len(st.session_state.indexed_documents)} documenti pronti per RAG ed estrazione.")
+
+            render_platform_pipeline(current_module.module_id)
 
         if st.session_state.processing_errors:
             st.error("Errori di elaborazione:")
@@ -474,22 +610,13 @@ def render_ui():
             c_btn, c_sim = st.columns([1, 1])
             with c_btn:
                 if st.button("🔔 Attiva Monitoraggio sui Record Verificati", use_container_width=True):
-                    mid = current_module.module_id
-                    rev_data = st.session_state.reviewed_data.get(mid, {})
-                    synced_count = 0
-                    for s_name, recs in rev_data.items():
-                        extracted_dl = extract_deadlines_from_records(mid, s_name, recs)
-                        for d_item in extracted_dl:
-                            upsert_deadline(
-                                d_item["id"], d_item["module_id"], d_item["schema_name"],
-                                d_item["field_name"], d_item["description"], d_item["due_date"],
-                                d_item["thresholds"], d_item["source_document"], d_item["source_page"]
-                            )
-                            synced_count += 1
-                    if synced_count > 0:
-                        st.success(f"✓ {synced_count} scadenze sincronizzate e attive per il monitoraggio!")
+                    n_sync = sync_deadlines_to_db(
+                        collect_payload(st.session_state.extracted_data, st.session_state.reviewed_data),
+                        st.session_state.indexed_documents.keys())
+                    if n_sync:
+                        st.success(f"✓ {n_sync} scadenze sincronizzate (tutti i moduli) e attive per il monitoraggio!")
                     else:
-                        st.info("Nessuna scadenza trovata nei record verificati. Effettua prima l'estrazione.")
+                        st.info("Nessuna scadenza trovata nei record. Esegui prima l'analisi.")
 
             with c_sim:
                 if st.button("🚀 Simula Scansione Notifiche (Dry-run)", use_container_width=True):

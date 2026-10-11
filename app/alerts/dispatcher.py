@@ -39,7 +39,7 @@ def dispatch_alerts(
 ) -> Dict[str, int]:
     """
     اجرای کامل فرآیند اسکن و توزیع هشدارها.
-    خروجی: دیکشنری تعداد هشدارهای ارسال‌شده و رد شده.
+    خروجی: دیکشنری تعداد هشدارهای ارسال‌شده، شبیه‌سازی‌شده و رد شده.
     """
     deadlines = get_active_deadlines()
     alerts = scan_deadlines(deadlines, today=today)
@@ -50,7 +50,8 @@ def dispatch_alerts(
     email_client = SmtpEmailNotifier()
     sms_client = TwilioSmsNotifier()
 
-    stats = {"sent_email": 0, "sent_sms": 0, "skipped": 0, "failed": 0}
+    # اضافه شدن کلید simulated
+    stats = {"sent_email": 0, "sent_sms": 0, "skipped": 0, "failed": 0, "simulated": 0}
 
     # ۱. پردازش ایمیل‌ها
     for rec in recipients_email:
@@ -70,6 +71,11 @@ def dispatch_alerts(
         if dry_run:
             print(f"[DRY-RUN EMAIL to {addr}]\n{subject}\n{body}\n")
             stats["sent_email"] += len(pending_alerts)
+            continue
+
+        # اگر تنظیمات SMTP کانفیگ نشده باشد، فقط در آمار شبیه‌سازی حساب می‌شود و لاگ 'sent' ثبت نمی‌شود
+        if not email_client.configured:
+            stats["simulated"] += len(pending_alerts)
             continue
 
         try:
@@ -93,6 +99,11 @@ def dispatch_alerts(
             if dry_run:
                 print(f"[DRY-RUN SMS to {addr}]: {msg_txt}")
                 stats["sent_sms"] += 1
+                continue
+
+            # اگر تنظیمات توئیلیو کانفیگ نشده باشد، لاگ 'sent' ثبت نمی‌شود
+            if not sms_client.configured:
+                stats["simulated"] += 1
                 continue
 
             try:

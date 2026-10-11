@@ -36,11 +36,11 @@ def scan_deadlines(
     alerts = []
 
     for d in deadlines:
-        due = date.fromisoformat(d["due_date"])
-        days_left = (due - today).days
-
-        if days_left < -max_overdue_days:
+        try:
+            due = date.fromisoformat(d["due_date"])
+        except (TypeError, ValueError):
             continue
+        days_left = (due - today).days
 
         thresholds = json.loads(d["thresholds"]) if isinstance(d["thresholds"], str) else d["thresholds"]
         t = classify(days_left, thresholds)
