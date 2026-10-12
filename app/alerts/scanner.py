@@ -42,6 +42,9 @@ def scan_deadlines(
             continue
         days_left = (due - today).days
 
+        if days_left < -max_overdue_days:
+            continue
+
         thresholds = json.loads(d["thresholds"]) if isinstance(d["thresholds"], str) else d["thresholds"]
         t = classify(days_left, thresholds)
         if t is None:

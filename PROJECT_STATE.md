@@ -4,7 +4,7 @@
 - **Current Milestone:** Step 8 Completed (Deterministic Auto-Routing, Batch Pipeline & Universal 4-Sheet Executive Report) 🟢
 - **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 18/18 Automated Pytest Test Suites Passing (100% Green).
+- **Test Suite Status:** 20/20 Automated Pytest Test Suites Passing (100% Green).
 
 ---
 
@@ -67,6 +67,18 @@
   - شیت ۴+: `Dati <Schema>` (شیت‌های تحلیلی با فرمت‌دهی شرطی اکسل، تاریخ‌های نیتیو و استایل سلول‌های محاسباتی)
 - **گاردریل هشدارهای شبیه‌سازی‌شده:** محافظت از ثبت لاگ `sent` در صورت عدم تنظیم کلاینت‌های واقعی SMTP/Twilio (`notifiers.configured`).
 - **تضمین تست خودکار:** افزوده شدن آزمون‌های جامع در `tests/test_pipeline.py` و تثبیت پایداری ۱۸ تست سبز.
+
+### Step 8.5 — Architectural Hardening & Governance (v2.6)
+- **فیلترینگ هوشمند سررسیدهای کهنه (`app/alerts/scanner.py`):** اعمال شرط `days_left < -max_overdue_days` جهت جلوگیری از بارگذاری و بررسی سررسیدهای بسیار قدیمی.
+- **رفع نشت کانکشن SQLite (`app/alerts/store.py`):** بازنویسی `get_connection()` به صورت کانتکست منیجر استاندارد `@contextmanager` با `timeout=30`، کامیت خودکار و بستن حتمی کانکشن در بلوک `finally`.
+- **فعال‌سازی سراسری حالت WAL در SQLite:** اجرای دستور `PRAGMA journal_mode=WAL;` در [database.py](file:///d:/ai-document-assistant/app/database/database.py) و [store.py](file:///d:/ai-document-assistant/app/alerts/store.py) جهت ممانعت قطعی از خطای `database is locked`.
+- **پشتیبانی دوگانه از پورت‌های امن ایمیل (`app/alerts/notifiers.py`):** پشتیبانی توأمان از پروتکل SSL مستقیم (پورت 465 با `SMTP_SSL`) و TLS (پورت 587 با `starttls`) با رعایت کامل گاردریل شبیه‌سازی در غیاب سرور واقعی.
+- **اصلاح بازنویسی استخراج دستی در UI (`app/ui/streamlit_app.py`):** به‌کارگیری `merge_result` در تب استخراج دستی (`tab_extraction`) به جای بازنویسی کامل دیکشنری، جهت حفظ سوابق استخراج‌شده از اسناد قبلی در سشن فعال.
+- **دکمه ارسال هشدارهای واقعی در UI (فاز ۲ - `streamlit_app.py`):** نمایش وضعیت پیکربندی SMTP/SMS و افزودن دکمه «Invia Allerte Reali» با غیرفعال‌سازی هوشمند در صورت عدم کانفیگ و گزارش دقیق آمار ارسال، شبیه‌سازی و خطاها.
+- **پاکسازی فایل‌های منسوخ و زائد (فاز ۳):** حذف کامل فایل `app/ui/platform_panel.py` و پاکسازی ارجاعات آن در مستندات جهت جلوگیری از انحراف کانتکست و بارگذاری ماژول‌های استفاده‌نشده.
+- **اعتبارسنجی ورودی گیرنده جدید در UI (`app/ui/streamlit_app.py`):** اعتبارسنجی فرمت ایمیل و شماره تلفن پیش از ثبت، بررسی خروجی تابع `add_recipient` و نمایش پیام‌های دقیق خطا و موفقیت.
+- **همگام‌سازی مدل پیش‌فرض استخراج با تنظیمات متمرکز (`app/extraction/registry.py`):** اتصال `DEFAULT_EXTRACTION_MODEL` به `app.config.GEMINI_MODEL` جهت حذف هاردکدینگ و پشتیبانی یکپارچه از تنظیم متغیرهای محیطی در `.env`.
+- **توسعه تست‌های واحد و ایزوله (Mock Notification):** افزوده شدن تست‌های `test_scan_deadlines_max_overdue_days` و `test_dispatch_alerts_configured_mock` به `tests/test_alerts.py` جهت سنجش شاخه‌های ارسال موفق نوتیفیکیشن با مانکی‌پچ آفلاین و تثبیت پایداری ۲۰/۲۰ تست ۱۰۰٪ سبز.
 
 ---
 

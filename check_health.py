@@ -91,7 +91,7 @@ def run_test_suite() -> bool:
         cwd=str(ROOT_DIR)
     )
     if res.returncode == 0:
-        print("   [OK] All 18 automated tests passed successfully.")
+        print("   [OK] All automated tests passed successfully.")
         return True
     else:
         print(f"   [FAIL] Pytest suite failed with exit code {res.returncode}.")

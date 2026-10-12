@@ -1,23 +1,29 @@
-"""SQLite persistence layer for deadlines, recipients, and alert logs."""
-import os
 import sqlite3
 import json
+from contextlib import contextmanager
 from app.config import get_db_path
 from typing import Dict, List, Optional, Any
 
-DB_PATH = os.getenv("ASSISTANT_DB_PATH", "assistant.db")
 
-
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(get_db_path())
+@contextmanager
+def get_connection():
+    conn = sqlite3.connect(get_db_path(), timeout=30)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def ensure_alert_tables() -> None:
     """ایجاد جداول مورد نیاز برای سیستم هشدارها در صورت عدم وجود."""
     with get_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
         cursor.executescript("""
         CREATE TABLE IF NOT EXISTS deadlines (
           id TEXT PRIMARY KEY,

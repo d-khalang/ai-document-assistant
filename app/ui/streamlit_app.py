@@ -22,10 +22,11 @@ from app.alerts.scanner import scan_deadlines
 from app.alerts.store import deactivate_deadlines_for_document
 from app.extraction.pipeline import (
     apply_results, build_routing_plan, collect_errors, collect_payload, evict_document,
-    pending_tasks, run_batch_extraction, sync_deadlines_to_db,
+    merge_result, pending_tasks, run_batch_extraction, sync_deadlines_to_db,
 )
 from app.alerts.deadlines import extract_deadlines_from_records
 from app.alerts.dispatcher import dispatch_alerts
+from app.alerts.notifiers import SmtpEmailNotifier, TwilioSmsNotifier
 from app.reporting.platform_excel_exporter import create_platform_excel_report
 
 from app.ai.gemini import generate_answer
@@ -516,8 +517,11 @@ def render_ui():
 
                         with st.spinner(f"Estrazione schema '{schema_def.label}' in corso..."):
                             result = extract_for_documents(pages_by_doc, schema_name, module_id=mid)
-                            
-                            st.session_state.extracted_data.setdefault(mid, {})[schema_name] = result
+                            done = [d for d in pages_by_doc if d not in result.get("errors", {})]
+                            existing = st.session_state.extracted_data.get(mid, {}).get(schema_name)
+                            st.session_state.extracted_data.setdefault(mid, {})[schema_name] = merge_result(
+                                existing, {**result, "processed_documents": done}
+                            )
                             st.session_state.reviewed_data.setdefault(mid, {}).pop(schema_name, None)
                             
                             ver_key = (mid, schema_name)
@@ -623,6 +627,22 @@ def render_ui():
                     res_sim = dispatch_alerts(dry_run=True)
                     st.info(f"Simulazione completata: Email={res_sim['sent_email']} | SMS={res_sim['sent_sms']} | Saltate={res_sim['skipped']}")
 
+            smtp_ok = SmtpEmailNotifier().configured
+            sms_ok = TwilioSmsNotifier().configured
+            st.caption(f"Email: {'✅ Configurato' if smtp_ok else '⚠️ Non configurato (SMTP_HOST nel .env)'} · "
+                       f"SMS: {'✅ Configurato' if sms_ok else '⚠️ Non configurato'}")
+
+            if st.button("📨 Invia Allerte Reali", type="primary", use_container_width=True,
+                         disabled=not (smtp_ok or sms_ok)):
+                with st.spinner("Invio notifiche in corso..."):
+                    res = dispatch_alerts(dry_run=False)
+                msg = (f"Email inviate: {res['sent_email']} · SMS inviati: {res['sent_sms']} · "
+                       f"Saltate (già inviate): {res['skipped']} · Simulate: {res['simulated']} · Fallite: {res['failed']}")
+                if res["failed"] > 0:
+                    st.error(msg)
+                else:
+                    st.success(msg)
+
             active_dls = get_active_deadlines()
             if active_dls:
                 st.markdown("### 📋 Elenco Scadenze Attive nel Database")
@@ -643,11 +663,19 @@ def render_ui():
                 st.write("")
                 st.write("")
                 if st.button("Aggiungi Destinatario", use_container_width=True):
-                    if new_addr:
+                    addr_clean = new_addr.strip()
+                    is_valid = ("@" in addr_clean and "." in addr_clean) if new_ch == "email" else (len(addr_clean) >= 8)
+                    
+                    if not addr_clean or not is_valid:
+                        st.warning("Inserisci un indirizzo email o un numero di telefono valido.")
+                    else:
                         import uuid
-                        add_recipient(str(uuid.uuid4()), new_ch, new_addr.strip())
-                        st.success("Destinatario aggiunto!")
-                        st.rerun()
+                        ok = add_recipient(str(uuid.uuid4()), new_ch, addr_clean)
+                        if ok:
+                            st.success("Destinatario aggiunto con successo!")
+                            st.rerun()
+                        else:
+                            st.error("Errore durante il salvataggio del destinatario.")
 
             curr_recs = get_active_recipients()
             if curr_recs:

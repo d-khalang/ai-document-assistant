@@ -14,6 +14,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (

@@ -5,6 +5,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.config import GEMINI_MODEL
+
 SCHEMAS_DIR = Path(__file__).resolve().parents[2] / "schemas"
 FIELD_TYPES = {"string", "date", "number", "plate"}
 COMPUTE_OPS = {"ratio", "sum", "diff", "product"}
@@ -12,7 +14,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "You are a precise document data extraction engine. Extract structured entities with absolute "
     "fidelity to the source text. Never invent values. If a field is not present, return null."
 )
-DEFAULT_EXTRACTION_MODEL = "gemini-3.6-flash"
+DEFAULT_EXTRACTION_MODEL = GEMINI_MODEL
 
 
 @dataclass

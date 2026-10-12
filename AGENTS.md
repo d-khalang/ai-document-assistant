@@ -24,7 +24,7 @@ This document defines the non-negotiable architectural invariants, development w
 - All domain calculations must be executed via pure, deterministic Python code in `app/extraction/calculators.py` or `app/extraction/pipeline.py`.
 
 ### 🔴 Principle 2: Strict Separation of Concerns (UI vs. Domain Core)
-- Streamlit modules in `app/ui/` (`streamlit_app.py`, `platform_panel.py`, `theme.py`) are **strictly presentation layers**.
+- Streamlit modules in `app/ui/` (`streamlit_app.py`, `theme.py`) are **strictly presentation layers**.
 - **NEVER** write core business logic, document extraction, vector retrieval, database queries, or file exporters directly inside Streamlit render loops.
 - Heavy/batch operations must run via dedicated pure functions (`run_batch_extraction` with `ThreadPoolExecutor`) without touching `st.session_state` or `st.*` from worker threads. Only the main script thread handles UI progress and updates session state.
 
@@ -62,7 +62,7 @@ ai-document-assistant/
 │   ├── extraction/             # Registry, calculators, normalizer, extractor, pipeline.py
 │   ├── rag/                    # Multi-format loaders, chunker, embeddings, vectorstore
 │   ├── reporting/              # Scoped Excel/Word exporters & Platform 4-sheet Excel engine
-│   └── ui/                     # Streamlit frontend, theme & platform pipeline panel
+│   └── ui/                     # Streamlit frontend & custom enterprise theme
 ├── assistant.db                # Local SQLite database (WAL mode)
 ├── chroma_data/                # Local ChromaDB persistent vector storage
 └── tests/                      # Automated Pytest suite (offline & isolated fixtures)

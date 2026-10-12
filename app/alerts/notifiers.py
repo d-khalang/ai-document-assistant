@@ -30,17 +30,25 @@ class SmtpEmailNotifier:
             print(f"[SMTP SIMULATION] To: {recipient} | Subject: {subject}\n{body}\n")
             return
 
+        import ssl
         msg = EmailMessage()
         msg["From"] = self.sender
         msg["To"] = recipient
         msg["Subject"] = subject
         msg.set_content(body)
 
-        with smtplib.SMTP(self.host, self.port, timeout=15) as s:
-            s.starttls()
-            if self.user:
-                s.login(self.user, self.password)
-            s.send_message(msg)
+        ctx = ssl.create_default_context()
+        if self.port == 465:
+            with smtplib.SMTP_SSL(self.host, self.port, timeout=15, context=ctx) as s:
+                if self.user:
+                    s.login(self.user, self.password)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(self.host, self.port, timeout=15) as s:
+                s.starttls(context=ctx)
+                if self.user:
+                    s.login(self.user, self.password)
+                s.send_message(msg)
 
     @property
     def configured(self) -> bool:

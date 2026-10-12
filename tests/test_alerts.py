@@ -41,3 +41,31 @@ def test_alert_engine_full():
 
     log_alert_result("log1", d["id"], d["due_date"], 15, "email", "auditor@effeemme.it", "sent")
     assert is_alert_already_sent(d["id"], d["due_date"], 15, "email", "auditor@effeemme.it") is True
+
+
+@pytest.mark.offline
+def test_scan_deadlines_max_overdue_days():
+    sample_deadlines = [
+        {"id": "d1", "description": "Overdue recently", "due_date": "2026-10-05", "thresholds": [30, 15, 7], "module_id": "m1"},
+        {"id": "d2", "description": "Overdue too old", "due_date": "2026-08-01", "thresholds": [30, 15, 7], "module_id": "m1"},
+    ]
+    # today is 2026-10-12:
+    # d1 is 7 days overdue (days_left = -7) -> within max_overdue_days=30
+    # d2 is 72 days overdue (days_left = -72) -> exceeds max_overdue_days=30
+    alerts = scan_deadlines(sample_deadlines, today=date(2026, 10, 12), max_overdue_days=30)
+    assert len(alerts) == 1
+    assert alerts[0].deadline_id == "d1"
+
+
+@pytest.mark.offline
+def test_dispatch_alerts_configured_mock(monkeypatch):
+    from app.alerts.notifiers import SmtpEmailNotifier
+    monkeypatch.setattr(SmtpEmailNotifier, "configured", True)
+    monkeypatch.setattr(SmtpEmailNotifier, "send", lambda self, to, sub, body: None)
+
+    upsert_deadline("d_mock", "m1", "s1", "f1", "Test Mock", "2026-10-15", [30, 15, 7], "doc.pdf", 1)
+    add_recipient("r_mock", "email", "audit_test@company.it")
+
+    stats = dispatch_alerts(today=date(2026, 10, 10), dry_run=False)
+    assert stats["sent_email"] >= 1
+    assert stats["failed"] == 0
