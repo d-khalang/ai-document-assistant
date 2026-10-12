@@ -1,14 +1,14 @@
-# Project State Tracking — Modular Platform Architecture (v2.4)
-
+# Project State Tracking — Modular Platform Architecture (v2.5)
+- **Architecture Phase:** Phase 1 (Advanced/Feature-Complete MVP — Streamlit + SQLite + Local ChromaDB)
 ## Current Status
-- **Current Milestone:** Step 7 Completed (Pytest Standardization, Robust Spreadsheet Parsing & Dynamic Tenant State) 🟢
-- **System Architecture:** Modular Multi-Tenant Document Intelligence Platform
+- **Current Milestone:** Step 8 Completed (Deterministic Auto-Routing, Batch Pipeline & Universal 4-Sheet Executive Report) 🟢
+- **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 12/12 Automated Pytest Suites Passing (100% Green).
+- **Test Suite Status:** 18/18 Automated Pytest Test Suites Passing (100% Green).
 
 ---
 
-## Completed Milestones (v2.4 Platform Evolution):
+## Completed Milestones:
 
 ### Phase 0–27 (Baseline MVP & Multimodal Core)
 - پیاده‌سازی پایپ‌لاین RAG بدون فریم‌ورک‌های واسط (Framework-Free) با پایتون خالص، Google GenAI، ChromaDB و SQLite.
@@ -16,7 +16,7 @@
 - استخراج داده‌های ممیزی سیستم مدیریت زیست‌محیطی ISO 14001 و تولید گزارش‌های سازمانی اکسل و ورد با امضاهای پویا و متادیتای شرکت.
 
 ### Step 1 — Modular Schema Registry
-- انتقال کامل منطق دامنه به فایل‌های ساختاریافته در مسیر `schemas/*.json` (`iso_14001.json`, `fleet_fuel_expenses.json`, `general_documents.json`).
+- انتقال کامل منطق دامنه به فایل‌های ساختاریافته در مسیر `schemas/*.json` (`iso_14001.json`, `energy_utility.json`, `hr_training.json`, `machinery_maintenance.json`, `fleet_fuel_expenses.json`, `general_documents.json`).
 - پیاده‌سازی رجیستری در `app/extraction/registry.py` همراه با اعتبارسنجی نوع داده‌ها و محاسبات ریاضی قطعی در `app/extraction/calculators.py`.
 - تبدیل `app/extraction/schemas.py` به یک Shim سازگار رو به عقب برای حفظ سلامت تست‌های قدیمی.
 
@@ -55,9 +55,28 @@
 - خوانش سطرهای اکسل با اندیس موقعیتی `.iloc` جهت تضمین دریافت مقادیر اسکالر.
 - حذف کامل اطلاعات هاردکدشده شرکتی؛ شروع هر نشست با فیلدهای کاملاً خالی و ذخیره‌سازی پویا در گزارش‌های خروجی اکسل و ورد.
 
+### Step 8 — Platform Batch Pipeline & 4-Sheet Enterprise Report (v2.5)
+- **موتور روتینگ قطعی و بدون توهم (`app/extraction/pipeline.py`):** نگاشت خودکار فایل‌های آپلود شده به ماژول/اسکیماهای متناظر بر اساس وزن‌دهی کلمات کلیدی (`strong_keywords`, `keywords`) و نام فایل در `schemas/*.json` بدون نیاز به تغییر سایدبار.
+- **بازبینی و تصحیح انسانی روتینگ (Human-in-the-Loop):** امکان بازبینی و تغییر دستی مقصد هر سند در جدول تعاملی پیش از شروع استخراج.
+- **استخراج دسته‌ای غیرمسدودکننده (Batch Pipeline):** استخراج هم‌زمان فایل‌ها با `ThreadPoolExecutor` (با ۳ ورکر موازی) و نمایش زنده وضعیت پیشرفت با `st.status` و `st.progress`.
+- **مدیریت چرخه حیات اسناد و سررسیدها:** پیاده‌سازی پاک‌سازی خودکار رکوردهای اسناد حذف‌شده (`evict_document`) و غیرفعال‌سازی سررسیدهای منسوخ یا ویرایش‌شده در دیتابیس (`deactivate_missing_deadlines`, `deactivate_deadlines_for_document`).
+- **خروجی اکسل چندشیته جامع پلتفرم (`app/reporting/platform_excel_exporter.py`):**
+  - شیت ۱: `Dashboard & KPI` (آمار اسناد، سررسیدها و درصد انطباق)
+  - شیت ۲: `Registro Documenti` (دفتر ثبت اسناد سازمانی با ستون‌های استاندارد و علت عدم تحلیل فایل‌ها)
+  - شیت ۳: `Scadenze & Azioni` (رادار سررسیدهای اولویت‌بندی‌شده، روزهای باقی‌مانده و اقدامات لازم)
+  - شیت ۴+: `Dati <Schema>` (شیت‌های تحلیلی با فرمت‌دهی شرطی اکسل، تاریخ‌های نیتیو و استایل سلول‌های محاسباتی)
+- **گاردریل هشدارهای شبیه‌سازی‌شده:** محافظت از ثبت لاگ `sent` در صورت عدم تنظیم کلاینت‌های واقعی SMTP/Twilio (`notifiers.configured`).
+- **تضمین تست خودکار:** افزوده شدن آزمون‌های جامع در `tests/test_pipeline.py` و تثبیت پایداری ۱۸ تست سبز.
+
 ---
 
-## Next Milestone:
-- **Step 8 — Multi-Tenant Multi-User Authentication & Production Readiness:**
-  - بررسی افزودن سیستم احراز هویت اولیه برای جداسازی سشن کاربران سازمانی.
-  - آماده‌سازی مخزن گیت‌هاب جهت ارائه و مستندسازی عمومی (Final README Architecture Diagram).
+## Remaining Action Items & Next Milestones:
+
+### Immediate Production Tuning:
+- تنظیم اعتبارنامه‌های واقعی ارسال ایمیل/پیامک (SMTP/Twilio) در فایل `.env`.
+- راه‌اندازی تسک خودکار زمان‌بندی‌شده روزانه (Cron Job / Windows Task Scheduler) برای اجرای خودکار `app/alerts/run.py`.
+- تیونینگ تدریجی کلمات کلیدی روتینگ در `schemas/*.json` با دریافت نمونه‌های بیشتر از اسناد شرکتی.
+
+### Step 9 — Production Hardening & Multi-Tenant Authentication:
+- افزودن لایه احراز هویت سبک (Authentication) برای تفکیک امن نشست‌های کاربران سازمانی.
+- آماده‌سازی کانتینر Docker و پایپ‌لاین CI برای ارزیابی مداوم کیفیت.
