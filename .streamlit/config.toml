@@ -1,10 +1,14 @@
 [theme]
-base = "dark"
-primaryColor = "#4ADE80"
-backgroundColor = "#0B1210"
-secondaryBackgroundColor = "#121C18"
-textColor = "#E6EDE9"
+base = "light"
+primaryColor = "#8CC63F"
+backgroundColor = "#F6F8F5"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1F2A22"
 font = "sans serif"
+
+[server]
+# Keep the app responsive for multi-document workspaces; adjust only if deployment policy requires it.
+maxUploadSize = 200
 
 [browser]
 gatherUsageStats = false

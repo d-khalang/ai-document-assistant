@@ -185,3 +185,47 @@ def deactivate_missing_deadlines(keep_ids, source_documents) -> int:
         cur = conn.execute(sql, params)
         conn.commit()
         return cur.rowcount
+
+
+def deactivate_all_deadlines() -> int:
+    """Soft-delete every active deadline (active = 0). alert_log is left intact for audit."""
+    with get_connection() as conn:
+        cur = conn.execute("UPDATE deadlines SET active = 0 WHERE active = 1")
+        conn.commit()
+        return cur.rowcount
+
+
+
+def deactivate_recipient_by_id(recipient_id: str) -> bool:
+    """Soft-delete a single alert recipient (active = 0). Returns True if a row was deactivated."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "UPDATE alert_recipients SET active = 0 WHERE id = ? AND active = 1", (recipient_id,)
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def deactivate_recipient(address: str, channel: Optional[str] = None) -> bool:
+    """Soft-delete an alert recipient by address and optionally channel. Returns True if a row was deactivated."""
+    with get_connection() as conn:
+        if channel:
+            cur = conn.execute(
+                "UPDATE alert_recipients SET active = 0 WHERE address = ? AND channel = ? AND active = 1",
+                (address, channel),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE alert_recipients SET active = 0 WHERE address = ? AND active = 1",
+                (address,),
+            )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def deactivate_all_recipients() -> int:
+    """Soft-delete every active alert recipient. Returns the number of deactivated rows."""
+    with get_connection() as conn:
+        cur = conn.execute("UPDATE alert_recipients SET active = 0 WHERE active = 1")
+        conn.commit()
+        return cur.rowcount

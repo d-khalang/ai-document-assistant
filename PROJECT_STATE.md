@@ -79,6 +79,11 @@
 - **اعتبارسنجی ورودی گیرنده جدید در UI (`app/ui/streamlit_app.py`):** اعتبارسنجی فرمت ایمیل و شماره تلفن پیش از ثبت، بررسی خروجی تابع `add_recipient` و نمایش پیام‌های دقیق خطا و موفقیت.
 - **همگام‌سازی مدل پیش‌فرض استخراج با تنظیمات متمرکز (`app/extraction/registry.py`):** اتصال `DEFAULT_EXTRACTION_MODEL` به `app.config.GEMINI_MODEL` جهت حذف هاردکدینگ و پشتیبانی یکپارچه از تنظیم متغیرهای محیطی در `.env`.
 - **توسعه تست‌های واحد و ایزوله (Mock Notification):** افزوده شدن تست‌های `test_scan_deadlines_max_overdue_days` و `test_dispatch_alerts_configured_mock` به `tests/test_alerts.py` جهت سنجش شاخه‌های ارسال موفق نوتیفیکیشن با مانکی‌پچ آفلاین و تثبیت پایداری ۲۰/۲۰ تست ۱۰۰٪ سبز.
+- **تثبیت پایداری اسناد در رابط کاربری (`app/ui/streamlit_app.py`):** رفع باگ حذف ناخواسته اسناد و رکوردهای برداری هنگام جابه‌جایی بین صفحات ۵‌گانه یا کلیک روی دکمه‌های دانلود؛ جداسازی کامل وضعیت پایدار `indexed_documents` از چرخه موقت `file_uploader` و افزودن کنترل‌های صریح حذف سند (`remove_single_document`) و پاکسازی کامل.
+- **پاکسازی یک‌کلیکی سررسیدها (`app/alerts/store.py` + `app/ui/streamlit_app.py`):** افزودن تابع `deactivate_all_deadlines()` (غیرفعال‌سازی نرم `active = 0` با حفظ کامل `alert_log` برای ممیزی)، تست آفلاین `test_deactivate_all_deadlines_clears_registry` و دکمه «Svuota registro scadenze» زیر جدول صفحه Scadenze & Allerte. تعداد تست‌ها: ۲۱/۲۱ سبز.
+- **مدیریت و حذف گیرندگان اعلان‌ها (`app/alerts/store.py` + `app/ui/streamlit_app.py`):** افزودن توابع `deactivate_recipient_by_id`, `deactivate_recipient` و `deactivate_all_recipients` برای حذف تکی و پاکسازی یکجای گیرندگان فعال، پیاده‌سازی کنترل‌های حذف و انتخابگر در رابط کاربری بخش Destinatari، پوشش تست جامع `test_recipient_deactivation_and_reactivation` در `tests/test_alerts.py`. مجموع تست‌های سیستم: ۲۲/۲۲ سبز (۱۰۰٪ پاس).
+- **مدرن‌سازی بصری و ارگونومی ناوبری سایدبار (`app/ui/theme.py`):** بازطراحی کامل استایل‌های `st.radio` در سایدبار به سبک Pill Tabs مدرن؛ فونت درشت‌تر (`1.15rem`، وزن ۶۰۰ تا ۷۵۰)، حذف دایره‌های رادیویی پیش‌فرض، موشن و شیفت افقی نرم هنگام Hover (`translateX(6px)` با سایه و پس‌زمینه ارگانیک `#EEF7E3`)، بردر و پس‌زمینه سبز شاخص برای تب فعال (`#E2F1D2` / `#8CC63F`) به همراه خط نشانگر عمودی (Accent line) و تست بدون خطای جابه‌جایی بین تمامی صفحات ۵‌گانه.
+
 
 ---
 

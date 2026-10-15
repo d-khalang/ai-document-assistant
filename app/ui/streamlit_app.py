@@ -9,17 +9,37 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, List
+from pathlib import Path
+from PIL import Image
 
-from app.ui.theme import inject_custom_css, render_kpi_row
+FAVICON_PATH = Path(__file__).resolve().parent / "assets" / "favicon.png"
+from app.ui.theme import (
+    inject_custom_css,
+    render_kpi_row,
+    render_stat_chips,
+    render_brand_header,
+    render_page_header,
+    render_sidebar_stats,
+    section_title,
+    sidebar_label,
+    danger_zone_marker,
+    layout_split_marker,
+    loader,
+    progress_bar,
+)
 from app.alerts.store import (
     ensure_alert_tables,
     upsert_deadline,
     get_active_deadlines,
     add_recipient,
-    get_active_recipients
+    get_active_recipients,
+    deactivate_deadlines_for_document,
+    deactivate_all_deadlines,
+    deactivate_recipient_by_id,
+    deactivate_recipient,
+    deactivate_all_recipients,
 )
 from app.alerts.scanner import scan_deadlines
-from app.alerts.store import deactivate_deadlines_for_document
 from app.extraction.pipeline import (
     apply_results, build_routing_plan, collect_errors, collect_payload, evict_document,
     merge_result, pending_tasks, run_batch_extraction, sync_deadlines_to_db,
@@ -61,7 +81,7 @@ from app.database.database import (
 
 
 def initialize_session():
-    """مقداردهی اولیه با فیلدهای شرکتی کاملاً خالی در شروع هر نشست."""
+    """Inizializzazione della sessione (idempotente)."""
     init_db()
     ensure_alert_tables()
 
@@ -87,8 +107,8 @@ def initialize_session():
     st.session_state.setdefault("routing_overrides", {})  # doc -> (mid, schema) | None (user choice)
     st.session_state.setdefault("routed_to", {})          # doc -> route actually extracted
     st.session_state.setdefault("platform_xlsx", None)    # (bytes, datetime)
+    st.session_state.setdefault("last_dispatch_result", None)
 
-    # در شروع هر بار باز شدن وب‌اپ، اطلاعات شرکت کاملاً خالی است تا کاربر خودش پر کند
     if "company_profile" not in st.session_state:
         st.session_state.company_profile = {
             "company_name": "",
@@ -103,17 +123,41 @@ def reset_conversation():
     st.session_state.conversation_id = create_conversation(st.session_state.user_id)
 
 
+def _reset_vector_index_callback():
+    clear_chroma_collection()
+    st.session_state.indexed_documents.clear()
+    reset_conversation()
+    st.session_state.extracted_data.clear()
+    st.session_state.reviewed_data.clear()
+    st.session_state.confirm_reset_index = False
+    st.session_state.flash_msg = "Indice vettoriale azzerato con successo!"
+
+
+def remove_single_document(doc_name: str) -> None:
+    """Rimuove in modo pulito e sicuro un documento da ChromaDB, stato sessione, scadenze ed estrazioni."""
+    ss = st.session_state
+    remove_document_from_chromadb(doc_name)
+    ss.indexed_documents.pop(doc_name, None)
+    ss.processing_errors.pop(doc_name, None)
+    evict_document(ss.extracted_data, ss.reviewed_data, ss.editor_version, doc_name)
+    deactivate_deadlines_for_document(doc_name)
+    for k in ("routing_plan", "routing_overrides", "routed_to"):
+        if k in ss and isinstance(ss[k], dict):
+            ss[k].pop(doc_name, None)
+    ss.platform_xlsx = None
+
+
 def process_single_document(file) -> int:
     pages = load_document_content(file, file.name)
     if not pages:
-        raise ValueError("No readable text could be extracted from document.")
+        raise ValueError("Nessun testo leggibile estratto dal documento.")
 
     for p in pages:
         p["document_name"] = file.name
 
     chunks = split_text_into_chunks(pages, file.name)
     if not chunks:
-        raise ValueError("Document did not produce any valid chunks.")
+        raise ValueError("Il documento non ha prodotto chunk validi.")
 
     chunk_texts = [c["text"] for c in chunks]
     embeddings = get_batch_embeddings(chunk_texts)
@@ -172,15 +216,14 @@ def _build_platform_report(labels: Dict[Any, str], effective: Dict[str, Any]) ->
 
 
 def render_platform_pipeline(preferred_module: str) -> None:
-    """One-click flow: deterministic routing -> parallel extraction -> deadline sync -> executive report."""
     ss = st.session_state
     docs = ss.indexed_documents
     labels = _route_labels()
     by_label = {v: k for k, v in labels.items()}
 
-    with st.expander("🚀 Analisi Automatica Piattaforma (Routing + Estrazione + Fascicolo)", expanded=True):
+    with st.expander(":material/auto_mode: Analisi Automatica Piattaforma (Routing & Fascicolo)", expanded=True):
         st.caption("I documenti vengono assegnati in modo deterministico al modulo/schema più adatto "
-                   "(regole in schemas/*.json). Puoi correggere l'instradamento prima di avviare.")
+                   "(regole in schemas/*.json). È possibile correggere l'instradamento prima dell'avvio.")
 
         new_docs = {n: m["pages"] for n, m in docs.items() if n not in ss.routing_plan}
         if new_docs:
@@ -211,13 +254,12 @@ def render_platform_pipeline(preferred_module: str) -> None:
                 ss.routing_overrides.pop(name, None)
 
         c_run, c_rebuild = st.columns(2)
-        run = c_run.button("▶️ Esegui analisi completa", type="primary", use_container_width=True,
+        run = c_run.button("Esegui analisi completa", icon=":material/play_arrow:", type="primary", use_container_width=True,
                            help="Estrae solo i documenti non ancora analizzati, sincronizza le scadenze e genera il fascicolo.")
-        rebuild = c_rebuild.button("📊 Rigenera solo il fascicolo", use_container_width=True,
-                                   help="Ricostruisce l'Excel includendo le modifiche fatte nella griglia di revisione.")
+        rebuild = c_rebuild.button("Rigenera solo fascicolo", icon=":material/refresh:", use_container_width=True,
+                                   help="Ricostruisce il fascicolo Excel includendo le modifiche fatte nella griglia di revisione.")
 
         if run:
-            # documents re-routed by the user: drop their records from the previous schema
             for doc, route in effective.items():
                 old = ss.routed_to.get(doc)
                 if old and old != route:
@@ -229,10 +271,11 @@ def render_platform_pipeline(preferred_module: str) -> None:
             failures = {}
             if tasks:
                 with st.status(f"Estrazione in corso: {len(tasks)} operazioni…", expanded=True) as status:
-                    bar = st.progress(0.0)
+                    bar = st.empty()
+                    progress_bar(bar, 0, len(tasks), "Analisi intelligente dei documenti")
 
-                    def on_progress(done, total, doc, sname, err):  # runs in the script thread
-                        bar.progress(done / total)
+                    def on_progress(done, total, doc, sname, err):
+                        progress_bar(bar, done, total, "Analisi intelligente dei documenti")
                         st.write(f"{'✗' if err else '✓'} **{doc}** → `{sname}`" + (f" — {err}" if err else ""))
                         if err:
                             failures[doc] = err
@@ -244,18 +287,21 @@ def render_platform_pipeline(preferred_module: str) -> None:
             else:
                 st.info("Nessun documento nuovo da analizzare.")
 
-            payload = collect_payload(ss.extracted_data, ss.reviewed_data)
-            n_dl = sync_deadlines_to_db(payload, docs.keys())
-            _build_platform_report(labels, effective)
+            with loader("Generazione del fascicolo", "Sincronizzazione scadenze e creazione Excel…", "sheet"):
+                payload = collect_payload(ss.extracted_data, ss.reviewed_data)
+                n_dl = sync_deadlines_to_db(payload, docs.keys())
+                _build_platform_report(labels, effective)
             st.success(f"Fascicolo pronto · {n_dl} scadenze sincronizzate per il monitoraggio.")
         elif rebuild:
-            sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), docs.keys())
-            _build_platform_report(labels, effective)
+            with loader("Rigenerazione del fascicolo", "Inclusione delle modifiche di revisione…", "sheet"):
+                sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), docs.keys())
+                _build_platform_report(labels, effective)
 
         if ss.platform_xlsx:
             data, ts = ss.platform_xlsx
             st.download_button(
-                label=f"📥 Scarica Fascicolo Gestionale Completo (.xlsx) — generato {ts:%H:%M:%S}",
+                label=f"Scarica Fascicolo Gestionale Completo (.xlsx) — {ts:%H:%M:%S}",
+                icon=":material/download:",
                 data=data,
                 file_name=f"Report_Gestionale_Completo_{ts:%Y%m%d_%H%M}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -263,423 +309,383 @@ def render_platform_pipeline(preferred_module: str) -> None:
             )
 
 
+
 def render_ui():
+    favicon = None
+    try:
+        if FAVICON_PATH.is_file():
+            with Image.open(FAVICON_PATH) as image:
+                favicon = image.copy()
+    except (OSError, ValueError):
+        favicon = None
+
     st.set_page_config(
-        page_title="AI Document Intelligence Platform",
-        page_icon="📋",
+        page_title="inambiente · Document Intelligence Platform",
+        page_icon=favicon or "🌿",
         layout="wide",
+        initial_sidebar_state="expanded",
     )
     inject_custom_css()
 
     initialize_session()
-    total_chunks = sum(doc["chunks"] for doc in st.session_state.indexed_documents.values())
+
+    flash = st.session_state.pop("flash_msg", None)
+    if flash:
+        st.toast(flash)
+
+    ss = st.session_state
+    modules = {m.module_id: m for m in list_modules()}
+    if not modules:
+        st.error("Nessun modulo operativo disponibile. Verificare schemas/*.json.")
+        return
 
     with st.sidebar:
-        st.header("⚙️ Workspace & Standards")
-
-        available_mods = {m.module_id: m for m in list_modules()}
-        selected_mod_id = st.selectbox(
-            "🧩 Modulo / Standard Operativo:",
-            options=list(available_mods.keys()),
-            format_func=lambda k: available_mods[k].label,
-            key="active_module"
+        render_brand_header()
+        st.markdown("<div class='nav-eyebrow'>WORKSPACE</div>", unsafe_allow_html=True)
+        page = st.radio(
+            "Navigazione principale",
+            options=[
+                "📄  Document Hub & Batch Pipeline",
+                "🏢  Profilo Aziendale / Tenant",
+                "💬  Document Chat (RAG)",
+                "📊  Estrazione & Revisione",
+                "⏰  Scadenze & Allerte",
+            ],
+            key="workspace_page",
+            label_visibility="collapsed",
         )
-        current_module = available_mods[selected_mod_id]
-
-        st.caption(f"**Versione Standard:** `{current_module.version}`")
-        if st.button("🔄 Ricarica Schemi (Hot Reload)", use_container_width=True, help="Ricarica i file JSON da schemas/ senza riavviare Streamlit"):
-            reload_registry()
-            st.success("Schemi e moduli aggiornati da disco!")
-            st.rerun()
-
         st.divider()
-
-        with st.expander("🏢 Profilo Aziendale / Tenant", expanded=False):
-            prof = st.session_state.company_profile
-            c_name = st.text_input("Ragione Sociale:", value=prof.get("company_name", ""), placeholder="es. Acme Solutions S.p.A.")
-            c_vat = st.text_input("P.IVA / Codice Fiscale:", value=prof.get("vat_number", ""), placeholder="es. IT12345678901")
-            c_addr = st.text_input("Sede Operativa:", value=prof.get("address", ""), placeholder="es. Via Roma 10, Torino (TO)")
-            c_rsga = st.text_input("Responsabile SGA / Referente:", value=prof.get("rsga_name", ""), placeholder="es. Ing. Mario Rossi")
-            c_dir = st.text_input("Direzione Tecnica / Firmatario:", value=prof.get("technical_director", ""), placeholder="es. Dott. Giuseppe Verdi")
-
-            if st.button("💾 Salva Profilo Aziendale", use_container_width=True):
-                update_company_profile(c_name, c_vat, c_addr, c_rsga, c_dir)
-                st.session_state.company_profile = {
-                    "company_name": c_name.strip(),
-                    "vat_number": c_vat.strip(),
-                    "address": c_addr.strip(),
-                    "rsga_name": c_rsga.strip(),
-                    "technical_director": c_dir.strip()
-                }
-                st.success("Profilo aziendale salvato!")
+        sidebar_label("Modulo operativo")
+        selected_mod_id = st.selectbox(
+            "Modulo / Standard Operativo",
+            options=list(modules),
+            format_func=lambda k: modules[k].label,
+            key="active_module",
+            help="Determina gli schemi di estrazione e i report ufficiali.",
+        )
+        current_module = modules[selected_mod_id]
+        company_name = (ss.company_profile.get("company_name") or "").strip()
+        st.markdown(
+            f"<div class='tenant-mini'><span class='tenant-dot'></span><div><b>{company_name or 'Tenant non configurato'}</b>"
+            f"<small>{len(ss.indexed_documents)} documenti attivi</small></div></div>",
+            unsafe_allow_html=True,
+        )
+        with st.expander("Strumenti amministrativi", expanded=False):
+            if st.button("Ricarica schemi", icon=":material/refresh:", use_container_width=True):
+                reload_registry()
+                st.success("Schemi aggiornati.")
                 st.rerun()
-
-        st.divider()
-        st.subheader("📚 Active Knowledge Base")
-        st.write(f"**Documenti Caricati:** `{len(st.session_state.indexed_documents)}`")
-        st.write(f"**Chunk Indicizzati:** `{total_chunks}`")
-
-        if st.session_state.indexed_documents:
-            for fname, meta in st.session_state.indexed_documents.items():
-                st.caption(f"✓ **{fname}** ({meta['chunks']} chunks)")
-
-        st.divider()
-        if st.button("🔄 Nuova Sessione Chat", use_container_width=True):
-            reset_conversation()
-            st.rerun()
-
-        with st.expander("🛠 Manutenzione Vettoriale", expanded=False):
-            st.caption("Elimina l'intero indice ChromaDB persistente su disco.")
-            if st.button("🗑️ Reset Totale Indice Vettoriale", use_container_width=True):
-                clear_chroma_collection()
-                st.session_state.indexed_documents.clear()
+            if st.button("Nuova conversazione", icon=":material/chat:", use_container_width=True):
                 reset_conversation()
-                st.session_state.extracted_data.clear()
-                st.session_state.reviewed_data.clear()
-                st.success("Indice vettoriale azzerato!")
                 st.rerun()
+            danger_zone_marker()
+            st.caption("L'operazione elimina l'indice vettoriale persistente.")
+            confirm_reset = st.checkbox("Confermo il reset dell'indice", key="confirm_reset_index")
+            st.button(
+                "Reset indice vettoriale", icon=":material/delete_forever:",
+                use_container_width=True, disabled=not confirm_reset,
+                key="btn_reset_index", on_click=_reset_vector_index_callback,
+            )
 
-    active_comp = st.session_state.company_profile.get("company_name", "").strip()
-    caption_tenant = f" | {active_comp}" if active_comp else ""
-    st.title(f"📋 {current_module.label}")
-    st.caption(f"Enterprise Document Intelligence — Multi-Tenant Platform{caption_tenant}")
+    render_page_header(current_module.label, current_module.version, company_name)
 
-    mid = current_module.module_id
-    total_docs = len(st.session_state.indexed_documents)
-
-    mod_records = sum(
-        len(st.session_state.reviewed_data.get(mid, {}).get(s, res.get("records", [])))
-        for s, res in st.session_state.extracted_data.get(mid, {}).items()
-    )
-
-    try:
-        active_deadlines = get_active_deadlines()
-        urgent_alerts = scan_deadlines(active_deadlines, max_overdue_days=30)
-        urgent_count = len([a for a in urgent_alerts if a.days_left <= 30])
-        urgent_level = "crit" if urgent_count > 0 else ""
-    except Exception:
-        urgent_count = 0
-        urgent_level = ""
-
-    kpi_items = [
-        ("Documenti Attivi", total_docs, "Knowledge Base", ""),
-        ("Chunk Vettoriali", total_chunks, "ChromaDB Indice", ""),
-        ("Record Estratti", mod_records, f"Modulo: {current_module.module_id}", ""),
-        ("Scadenze (≤ 30 gg)", urgent_count, "Attenzione richiesta", urgent_level)
-    ]
-    render_kpi_row(kpi_items)
-
-    col_ingest, col_workspace = st.columns([1, 1.2], gap="large")
-
-    with col_ingest:
-        st.subheader("1. Ingestion Pipeline")
+    # PAGE 1 — upload, preview, routing and batch pipeline
+    if page.startswith("📄"):
+        section_title("Document Hub & Batch Pipeline", "Caricamento, anteprima, routing deterministico ed esportazione del fascicolo.")
         uploaded_files = st.file_uploader(
-            "Carica documenti aziendali (PDF, DOCX, XLSX, Immagini):",
+            "Aggiungi documenti all'area di lavoro",
             type=["pdf", "docx", "xlsx", "xls", "jpg", "jpeg", "png", "webp"],
             accept_multiple_files=True,
-            help="Supporta PDF nativi o scansionati, Word (.docx), fogli Excel (.xlsx/.xls) e immagini."
+            help="PDF digitali o scansionati, Word, Excel e immagini.",
+            key="workspace_file_uploader",
         )
-
-        current_filenames = [f.name for f in uploaded_files] if uploaded_files else []
-
-        indexed_names = list(st.session_state.indexed_documents.keys())
-        for existing_name in indexed_names:
-            if existing_name not in current_filenames:
-                remove_document_from_chromadb(existing_name)
-                del st.session_state.indexed_documents[existing_name]
-                st.session_state.processing_errors.pop(existing_name, None)
-                evict_document(st.session_state.extracted_data, st.session_state.reviewed_data,
-                               st.session_state.editor_version, existing_name)
-                deactivate_deadlines_for_document(existing_name)
-                for key in ("routing_plan", "routing_overrides", "routed_to"):
-                    st.session_state[key].pop(existing_name, None)
-                st.session_state.platform_xlsx = None
-
-        if not current_filenames and indexed_names:
-            reset_conversation()
-            st.session_state.extracted_data.clear()
-            st.session_state.reviewed_data.clear()
-            st.rerun()
-
         if uploaded_files:
-            files_to_process = [
-                f for f in uploaded_files 
-                if f.name not in st.session_state.indexed_documents 
-                and f.name not in st.session_state.processing_errors
-            ]
-
-            if files_to_process:
-                with st.status(f"Elaborazione in corso ({len(files_to_process)} file)...", expanded=True) as status:
-                    for f in files_to_process:
+            todo = [f for f in uploaded_files if f.name not in ss.indexed_documents and f.name not in ss.processing_errors]
+            if todo:
+                with st.status(f"Indicizzazione di {len(todo)} documenti…", expanded=True) as status:
+                    for f in todo:
                         try:
-                            st.write(f"Analisi **{f.name}**...")
-                            chunk_count = process_single_document(f)
-                            st.write(f"✓ **{f.name}**: indicizzato ({chunk_count} chunk)")
-                        except Exception as e:
-                            st.session_state.processing_errors[f.name] = str(e)
-                            st.write(f"✗ **{f.name}**: errore ({str(e)})")
+                            with loader(f"Lettura di {f.name}", "Indicizzazione e preparazione della ricerca documentale…", "orbit"):
+                                count = process_single_document(f)
+                            st.write(f"✓ {f.name} — {count} segmenti indicizzati")
+                        except Exception as exc:
+                            ss.processing_errors[f.name] = str(exc)
+                            st.write(f"✕ {f.name} — {exc}")
+                    status.update(label="Indicizzazione completata", state="complete", expanded=False)
 
-                    status.update(label="Elaborazione batch completata!", state="complete", expanded=False)
-        else:
-            st.session_state.processing_errors = {}
+        docs = ss.indexed_documents
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Documenti attivi", len(docs))
+        k2.metric("Indicizzati", sum(1 for d in docs.values() if d.get("status") == "Ready"))
+        k3.metric("Errori di lettura", len(ss.processing_errors))
+        if docs:
+            st.markdown("#### Documenti nell'area di lavoro")
+            rows = [{"Documento": n, "Pagine": len(m.get("pages", [])), "Segmenti": m.get("chunks", 0), "Stato": m.get("status", "Ready")} for n, m in docs.items()]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-        if st.session_state.indexed_documents:
-            st.success(f"Archivio attivo: {len(st.session_state.indexed_documents)} documenti pronti per RAG ed estrazione.")
-
-            render_platform_pipeline(current_module.module_id)
-
-        if st.session_state.processing_errors:
-            st.error("Errori di elaborazione:")
-            for fname, err in st.session_state.processing_errors.items():
-                st.markdown(f"- ⚠️ **{fname}**: {err}")
-
-    with col_workspace:
-        tab_chat, tab_extraction, tab_deadlines = st.tabs([
-            "💬 Document Chat (RAG)", 
-            "📊 Structured Extraction & Review", 
-            "⏰ Scadenze & Monitoraggio"
-        ])
-
-        with tab_chat:
-            st.caption("Interroga semanticamente tutti i documenti attivi.")
-            history = get_conversation_history(st.session_state.conversation_id)
-
-            chat_container = st.container(height=380)
-            with chat_container:
-                if not history:
-                    st.info("La Knowledge Base è attiva. Poni una domanda sui documenti.")
-                for msg in history:
-                    with st.chat_message(msg["role"]):
-                        st.markdown(msg["content"])
-
-            with st.expander("⚙️ Parametri Avanzati di Ricerca (Opzionale)", expanded=False):
-                top_k = st.slider(
-                    "Profondità di contesto (Top-K Chunks):",
-                    min_value=1,
-                    max_value=8,
-                    value=RAG_TOP_K,
-                    help="Numero di frammenti di testo più rilevanti inviati al modello per la risposta."
+            c_del_doc, c_del_btn, c_del_all = st.columns([2.5, 1, 1], gap="small")
+            with c_del_doc:
+                target_to_remove = st.selectbox(
+                    "Seleziona documento da rimuovere",
+                    options=list(docs.keys()),
+                    key="sel_remove_doc",
+                    label_visibility="collapsed",
                 )
-            user_query = st.chat_input("Fai una domanda sui documenti...")
+            with c_del_btn:
+                if st.button("Elimina documento", icon=":material/delete:", use_container_width=True):
+                    if target_to_remove:
+                        remove_single_document(target_to_remove)
+                        st.toast(f"Documento '{target_to_remove}' rimosso dall'area di lavoro.")
+                        st.rerun()
+            with c_del_all:
+                if st.button("Svuota tutto", icon=":material/delete_sweep:", use_container_width=True):
+                    for d in list(docs.keys()):
+                        remove_single_document(d)
+                    reset_conversation()
+                    ss.extracted_data.clear()
+                    ss.reviewed_data.clear()
+                    st.toast("Tutti i documenti sono stati rimossi.")
+                    st.rerun()
 
-            if user_query:
-                if not st.session_state.indexed_documents:
-                    st.warning("Carica almeno un documento prima di avviare la chat.")
-                else:
-                    with st.spinner("Sintesi della risposta dai documenti verificati..."):
-                        try:
-                            active_doc_names = list(st.session_state.indexed_documents.keys())
-                            retrieved_chunks = retrieve_relevant_chunks(
-                                query=user_query,
-                                collection_name="document_chunks",
-                                top_k=top_k,
-                                document_names=active_doc_names
-                            )
-                            rag_prompt = build_rag_prompt(user_query, retrieved_chunks)
-                            assistant_answer = generate_answer(rag_prompt)
-                            save_message(st.session_state.conversation_id, "user", user_query)
-                            save_message(st.session_state.conversation_id, "assistant", assistant_answer)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"⚠️ {str(e)}")
-
-        with tab_extraction:
-            mid = current_module.module_id
-            st.caption(f"Estrazione mirata per: **{current_module.label}**")
-
-            schema_names = list(current_module.schemas.keys())
-            if not schema_names:
-                st.warning("Nessuno schema disponibile per questo modulo.")
-            else:
-                schema_name = st.selectbox(
-                    "Schema di Estrazione:",
-                    options=schema_names,
-                    format_func=lambda s: f"{current_module.schemas[s].label} — {current_module.schemas[s].description}",
-                    key=f"schema_select_{mid}"
-                )
-                schema_def = current_module.schemas[schema_name]
-
-                if not st.session_state.indexed_documents:
-                    st.info("📂 Carica almeno un documento nella colonna di sinistra per abilitare l'estrazione.")
-                else:
-                    docs_map = st.session_state.indexed_documents
-                    target_doc = st.selectbox(
-                        "Documento Sorgente:",
-                        options=["ALL ACTIVE DOCUMENTS"] + list(docs_map.keys()),
-                        key=f"doc_target_{mid}"
-                    )
-
-                    if st.button("🚀 Avvia Estrazione Strutturata", use_container_width=True):
-                        chosen_docs = (
-                            docs_map if target_doc == "ALL ACTIVE DOCUMENTS" else {target_doc: docs_map[target_doc]}
-                        )
-                        pages_by_doc = {name: meta["pages"] for name, meta in chosen_docs.items()}
-
-                        with st.spinner(f"Estrazione schema '{schema_def.label}' in corso..."):
-                            result = extract_for_documents(pages_by_doc, schema_name, module_id=mid)
-                            done = [d for d in pages_by_doc if d not in result.get("errors", {})]
-                            existing = st.session_state.extracted_data.get(mid, {}).get(schema_name)
-                            st.session_state.extracted_data.setdefault(mid, {})[schema_name] = merge_result(
-                                existing, {**result, "processed_documents": done}
-                            )
-                            st.session_state.reviewed_data.setdefault(mid, {}).pop(schema_name, None)
-                            
-                            ver_key = (mid, schema_name)
-                            st.session_state.editor_version[ver_key] = st.session_state.editor_version.get(ver_key, 0) + 1
-
-                            if result.get("errors"):
-                                for err_doc, err_msg in result["errors"].items():
-                                    st.warning(f"⚠️ Errore su {err_doc}: {err_msg}")
-                            else:
-                                st.success(f"Estratti {result['total_records']} record con successo!")
-
-                current_res = st.session_state.extracted_data.get(mid, {}).get(schema_name)
-                if current_res and current_res.get("records"):
-                    st.markdown(f"### 📋 Revisione Record: `{schema_def.label}`")
-                    st.info("💡 Modifica i dati direttamente nella griglia: i valori modificati saranno ricalcolati e inseriti nei report finali.")
-
-                    ver = st.session_state.editor_version.get((mid, schema_name), 0)
-                    initial_records = current_res["records"]
-                    df_for_editor = records_to_dataframe(initial_records, schema_def)
-
-                    edited_df = st.data_editor(
-                        df_for_editor,
-                        use_container_width=True,
-                        num_rows="dynamic",
-                        key=f"editor_{mid}_{schema_name}_{ver}",
-                        column_config={"_rid": None},
-                        disabled=["source_document", "source_page"]
-                    )
-
-                    reviewed_records = dataframe_to_records(edited_df, initial_records, schema_def)
-                    st.session_state.reviewed_data.setdefault(mid, {})[schema_name] = reviewed_records
-
-                    st.caption(f"✓ Record verificati: `{len(reviewed_records)}` | Modulo attivo: `{current_module.label}`")
-
-                    st.divider()
-                    st.subheader("📥 Genera Report Ufficiali")
-                    
-                    all_schema_fields = schema_def.ordered_field_names()
-                    schema_labels = schema_def.all_labels()
-                    
-                    selected_cols = st.multiselect(
-                        "Seleziona colonne per l'esportazione:",
-                        options=all_schema_fields,
-                        default=all_schema_fields,
-                        format_func=lambda f: schema_labels.get(f, f),
-                        key=f"export_cols_{mid}_{schema_name}"
-                    )
-                    st.session_state.export_fields.setdefault(mid, {})[schema_name] = selected_cols
-
-                    col_dl_excel, col_dl_word = st.columns(2)
-                    payload = build_export_payload(mid)
-                    prefix = current_module.report.get("filename_prefix", "REPORT")
-
-                    with col_dl_excel:
-                        excel_bytes = create_styled_excel_report(
-                            extracted_data_by_schema=payload,
-                            source_documents=list(st.session_state.indexed_documents.keys()),
-                            company_profile=st.session_state.company_profile,
-                            selected_fields_by_schema=st.session_state.export_fields.get(mid, {}),
-                            module_id=mid
-                        )
-                        st.download_button(
-                            label=f"📊 Scarica Excel Ufficiale ({prefix})",
-                            data=excel_bytes,
-                            file_name=f"Report_{prefix}_{schema_name}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-
-                    with col_dl_word:
-                        word_bytes = create_styled_word_report(
-                            extracted_data_by_schema=payload,
-                            source_documents=list(st.session_state.indexed_documents.keys()),
-                            company_profile=st.session_state.company_profile,
-                            selected_fields_by_schema=st.session_state.export_fields.get(mid, {}),
-                            module_id=mid
-                        )
-                        st.download_button(
-                            label="📄 Scarica Verbale Word Ufficiale (.docx)",
-                            data=word_bytes,
-                            file_name=f"Verbale_{prefix}_{datetime.now().strftime('%Y%m%d')}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True
-                        )
-
-        with tab_deadlines:
-            st.subheader("⏰ Monitoraggio Scadenze e Allerte Automatiche")
-            st.caption("Pianificazione automatica scadenze normative e invio notifiche Email/SMS.")
-
-            c_btn, c_sim = st.columns([1, 1])
-            with c_btn:
-                if st.button("🔔 Attiva Monitoraggio sui Record Verificati", use_container_width=True):
-                    n_sync = sync_deadlines_to_db(
-                        collect_payload(st.session_state.extracted_data, st.session_state.reviewed_data),
-                        st.session_state.indexed_documents.keys())
-                    if n_sync:
-                        st.success(f"✓ {n_sync} scadenze sincronizzate (tutti i moduli) e attive per il monitoraggio!")
-                    else:
-                        st.info("Nessuna scadenza trovata nei record. Esegui prima l'analisi.")
-
-            with c_sim:
-                if st.button("🚀 Simula Scansione Notifiche (Dry-run)", use_container_width=True):
-                    res_sim = dispatch_alerts(dry_run=True)
-                    st.info(f"Simulazione completata: Email={res_sim['sent_email']} | SMS={res_sim['sent_sms']} | Saltate={res_sim['skipped']}")
-
-            smtp_ok = SmtpEmailNotifier().configured
-            sms_ok = TwilioSmsNotifier().configured
-            st.caption(f"Email: {'✅ Configurato' if smtp_ok else '⚠️ Non configurato (SMTP_HOST nel .env)'} · "
-                       f"SMS: {'✅ Configurato' if sms_ok else '⚠️ Non configurato'}")
-
-            if st.button("📨 Invia Allerte Reali", type="primary", use_container_width=True,
-                         disabled=not (smtp_ok or sms_ok)):
-                with st.spinner("Invio notifiche in corso..."):
-                    res = dispatch_alerts(dry_run=False)
-                msg = (f"Email inviate: {res['sent_email']} · SMS inviati: {res['sent_sms']} · "
-                       f"Saltate (già inviate): {res['skipped']} · Simulate: {res['simulated']} · Fallite: {res['failed']}")
-                if res["failed"] > 0:
-                    st.error(msg)
-                else:
-                    st.success(msg)
-
-            active_dls = get_active_deadlines()
-            if active_dls:
-                st.markdown("### 📋 Elenco Scadenze Attive nel Database")
-                df_dl = pd.DataFrame(active_dls)[["due_date", "description", "module_id", "source_document", "source_page"]]
-                df_dl.columns = ["Data Scadenza", "Descrizione Obbligo", "Modulo", "Documento", "Pagina"]
-                st.dataframe(df_dl, use_container_width=True)
-            else:
-                st.caption("Nessuna scadenza attualmente monitorata nel database.")
-
+            with st.expander("🔍 Anteprima testo estratto (Opzionale)", expanded=False):
+                preview_name = st.selectbox("Seleziona documento da visualizzare", options=list(docs), key="hub_preview_doc")
+                pages = docs[preview_name].get("pages", [])
+                if pages:
+                    page_opts = list(range(len(pages)))
+                    selected_page = st.selectbox("Pagina", page_opts, format_func=lambda n: f"Pagina {n + 1}", key="hub_preview_page")
+                    with st.container(border=True):
+                        st.caption(f"{preview_name} · pagina {selected_page + 1}")
+                        st.text((pages[selected_page].get("text") or "Testo non disponibile")[:12000])
+            if ss.processing_errors:
+                with st.expander("Documenti con errori", expanded=True):
+                    for name, error in ss.processing_errors.items():
+                        st.error(f"{name}: {error}")
+                    if st.button("Cancella errori", icon=":material/clear_all:", key="btn_clear_proc_errors"):
+                        ss.processing_errors.clear()
+                        st.rerun()
             st.divider()
-            st.markdown("### 📬 Configurazione Destinatari Allerte")
-            c_rec_addr, c_rec_type, c_rec_add = st.columns([2, 1, 1])
-            with c_rec_addr:
-                new_addr = st.text_input("Indirizzo Email o Telefono (+39...):", key="new_alert_addr")
-            with c_rec_type:
-                new_ch = st.selectbox("Canale:", ["email", "sms"], key="new_alert_ch")
-            with c_rec_add:
-                st.write("")
-                st.write("")
-                if st.button("Aggiungi Destinatario", use_container_width=True):
-                    addr_clean = new_addr.strip()
-                    is_valid = ("@" in addr_clean and "." in addr_clean) if new_ch == "email" else (len(addr_clean) >= 8)
-                    
-                    if not addr_clean or not is_valid:
-                        st.warning("Inserisci un indirizzo email o un numero di telefono valido.")
-                    else:
-                        import uuid
-                        ok = add_recipient(str(uuid.uuid4()), new_ch, addr_clean)
-                        if ok:
-                            st.success("Destinatario aggiunto con successo!")
-                            st.rerun()
-                        else:
-                            st.error("Errore durante il salvataggio del destinatario.")
+            render_platform_pipeline(current_module.module_id)
+        else:
+            if ss.processing_errors:
+                with st.expander("Documenti con errori", expanded=True):
+                    for name, error in ss.processing_errors.items():
+                        st.error(f"{name}: {error}")
+                    if st.button("Cancella errori", icon=":material/clear_all:", key="btn_clear_proc_errors_empty"):
+                        ss.processing_errors.clear()
+                        st.rerun()
+            st.info("Carica uno o più documenti per avviare il workspace.")
 
-            curr_recs = get_active_recipients()
-            if curr_recs:
-                st.write("**Destinatari Attivi:** " + ", ".join([f"`{r['channel'].upper()}: {r['address']}`" for r in curr_recs]))
+    # PAGE 2 — tenant profile
+    elif page.startswith("🏢"):
+        section_title("Profilo Aziendale / Tenant", "Metadati riutilizzati nelle intestazioni e nelle firme dei report ufficiali.")
+        prof = ss.company_profile
+        with st.container(border=True):
+            st.markdown("#### Identità legale e sede")
+            c1, c2 = st.columns(2, gap="large")
+            with c1:
+                c_name = st.text_input("Ragione sociale", value=prof.get("company_name", ""), placeholder="inambiente S.r.l.", key="tenant_company_name")
+                c_vat = st.text_input("Partita IVA / Codice fiscale", value=prof.get("vat_number", ""), key="tenant_vat")
+            with c2:
+                c_addr = st.text_area("Sede operativa", value=prof.get("address", ""), height=100, key="tenant_address")
+                c_rsga = st.text_input("Responsabile SGA / referente", value=prof.get("rsga_name", ""), key="tenant_rsga")
+        with st.container(border=True):
+            st.markdown("#### Direzione tecnica e firme")
+            c_dir = st.text_input("Direzione tecnica / firmatario", value=prof.get("technical_director", ""), key="tenant_director")
+            st.caption("I campi disponibili riflettono lo schema del profilo aziendale attualmente supportato dal database.")
+        if st.button("Salva profilo aziendale", icon=":material/save:", type="primary", use_container_width=True):
+            update_company_profile(c_name.strip(), c_vat.strip(), c_addr.strip(), c_rsga.strip(), c_dir.strip())
+            ss.company_profile = {"company_name": c_name.strip(), "vat_number": c_vat.strip(), "address": c_addr.strip(), "rsga_name": c_rsga.strip(), "technical_director": c_dir.strip()}
+            st.success("Profilo aziendale salvato.")
+            st.rerun()
+        st.markdown("#### Anteprima intestazione")
+        with st.container(border=True):
+            st.markdown(f"**{c_name.strip() or 'Ragione sociale non impostata'}**")
+            st.write(c_addr.strip() or "Sede operativa non impostata")
+            st.caption(f"P.IVA: {c_vat.strip() or '—'} · Responsabile SGA: {c_rsga.strip() or '—'} · Direzione tecnica: {c_dir.strip() or '—'}")
+
+    # PAGE 3 — full-page RAG chat. Top-K remains config-driven.
+    elif page.startswith("💬"):
+        section_title("Document Chat", "Interroga il contenuto dei documenti attivi. Le risposte si basano sui passaggi recuperati.")
+        history = get_conversation_history(ss.conversation_id)
+        with st.container(height=500, border=True):
+            if not history:
+                st.info("La conversazione è vuota. Inserisci una domanda sui documenti indicizzati.")
+            for msg in history:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+        query = st.chat_input("Scrivi una domanda sui documenti attivi…")
+        if query:
+            if not ss.indexed_documents:
+                st.warning("Prima carica almeno un documento nella pagina Document Hub.")
+            else:
+                with loader("Ricerca nei documenti", "Recupero semantico e generazione della risposta…", "orbit"):
+                    try:
+                        chunks = retrieve_relevant_chunks(query=query, collection_name="document_chunks", top_k=RAG_TOP_K, document_names=list(ss.indexed_documents))
+                        answer = generate_answer(build_rag_prompt(query, chunks))
+                        save_message(ss.conversation_id, "user", query)
+                        save_message(ss.conversation_id, "assistant", answer)
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Impossibile completare la ricerca: {exc}")
+
+    # PAGE 4 — extraction, human review, official exports
+    elif page.startswith("📊"):
+        mid = current_module.module_id
+        section_title("Estrazione & Revisione", "Estrazione strutturata, revisione manuale e report ufficiali Excel/Word.")
+        schemas = list(current_module.schemas)
+        if not schemas:
+            st.warning("Nessuno schema disponibile per il modulo selezionato.")
+            return
+        schema_name = st.selectbox("Schema di estrazione", schemas, format_func=lambda s: f"{current_module.schemas[s].label} — {current_module.schemas[s].description}", key=f"schema_select_{mid}")
+        schema = current_module.schemas[schema_name]
+        if not ss.indexed_documents:
+            st.info("Carica prima i documenti dalla pagina Document Hub.")
+        else:
+            doc_options = ["ALL ACTIVE DOCUMENTS"] + list(ss.indexed_documents)
+            target = st.selectbox("Documenti sorgente", doc_options, key=f"doc_target_{mid}")
+            if st.button("Avvia estrazione strutturata", icon=":material/bolt:", type="primary", use_container_width=True):
+                chosen = ss.indexed_documents if target == "ALL ACTIVE DOCUMENTS" else {target: ss.indexed_documents[target]}
+                pages_map = {name: meta["pages"] for name, meta in chosen.items()}
+                with loader(f"Estrazione: {schema.label}", "Normalizzazione e calcoli deterministici…", "bar"):
+                    result = extract_for_documents(pages_map, schema_name, module_id=mid)
+                    done = [d for d in pages_map if d not in result.get("errors", {})]
+                    existing = ss.extracted_data.get(mid, {}).get(schema_name)
+                    ss.extracted_data.setdefault(mid, {})[schema_name] = merge_result(existing, {**result, "processed_documents": done})
+                    ss.reviewed_data.setdefault(mid, {}).pop(schema_name, None)
+                    vkey = (mid, schema_name)
+                    ss.editor_version[vkey] = ss.editor_version.get(vkey, 0) + 1
+                for name, error in result.get("errors", {}).items():
+                    st.warning(f"{name}: {error}")
+                if not result.get("errors"):
+                    st.success(f"Record estratti: {result.get('total_records', 0)}")
+        current = ss.extracted_data.get(mid, {}).get(schema_name)
+        if current and current.get("records"):
+            records = current["records"]
+            reviewed = ss.reviewed_data.get(mid, {}).get(schema_name)
+            source_records = reviewed if reviewed is not None else records
+            st.metric("Record disponibili per revisione", len(source_records))
+            df = records_to_dataframe(source_records, schema)
+            version = ss.editor_version.get((mid, schema_name), 0)
+            edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic", key=f"editor_{mid}_{schema_name}_{version}", column_config={"_rid": None}, disabled=["source_document", "source_page"])
+            ss.reviewed_data.setdefault(mid, {})[schema_name] = dataframe_to_records(edited_df, source_records, schema)
+            st.caption("Le modifiche manuali vengono normalizzate nuovamente e i campi derivati sono ricalcolati dal motore esistente.")
+            fields = schema.ordered_field_names()
+            labels = schema.all_labels()
+            selected = st.multiselect("Campi inclusi nei report", fields, default=ss.export_fields.get(mid, {}).get(schema_name, fields), format_func=lambda f: labels.get(f, f), key=f"export_cols_{mid}_{schema_name}")
+            ss.export_fields.setdefault(mid, {})[schema_name] = selected
+            payload = build_export_payload(mid)
+            prefix = current_module.report.get("filename_prefix", "REPORT")
+            c_excel, c_word = st.columns(2, gap="large")
+            excel_bytes = create_styled_excel_report(extracted_data_by_schema=payload, source_documents=list(ss.indexed_documents), company_profile=ss.company_profile, selected_fields_by_schema=ss.export_fields.get(mid, {}), module_id=mid)
+            word_bytes = create_styled_word_report(extracted_data_by_schema=payload, source_documents=list(ss.indexed_documents), company_profile=ss.company_profile, selected_fields_by_schema=ss.export_fields.get(mid, {}), module_id=mid)
+            with c_excel:
+                st.download_button("Scarica Excel ufficiale", excel_bytes, file_name=f"Report_{prefix}_{schema_name}_{datetime.now():%Y%m%d}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", icon=":material/table_chart:", use_container_width=True)
+            with c_word:
+                st.download_button("Scarica report Word", word_bytes, file_name=f"Verbale_{prefix}_{datetime.now():%Y%m%d}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", icon=":material/description:", use_container_width=True)
+
+    # PAGE 5 — deadlines and notifications
+    elif page.startswith("⏰"):
+        section_title("Monitoraggio Scadenze & Allerte", "Scadenze attive, stato di conformità e gestione dei canali di notifica.")
+        active = get_active_deadlines()
+        today = datetime.now().date()
+        overdue = 0
+        soon = 0
+        for item in active:
+            try:
+                days = (datetime.fromisoformat(str(item["due_date"])).date() - today).days
+                overdue += days < 0
+                soon += 0 <= days <= 30
+            except (ValueError, TypeError, KeyError):
+                pass
+        a, b, c = st.columns(3)
+        a.metric("Scadenze attive", len(active))
+        b.metric("Scadute", overdue)
+        c.metric("Entro 30 giorni", soon)
+        c_sync, c_sim = st.columns(2, gap="large")
+        with c_sync:
+            if st.button("Sincronizza scadenze dai record", icon=":material/sync:", use_container_width=True):
+                count = sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), ss.indexed_documents.keys())
+                st.success(f"Scadenze sincronizzate: {count}")
+                st.rerun()
+        with c_sim:
+            if st.button("Simula invio (dry-run)", icon=":material/science:", use_container_width=True):
+                ss.last_dispatch_result = ("dry_run", dispatch_alerts(dry_run=True))
+        email_ok = SmtpEmailNotifier().configured
+        sms_ok = TwilioSmsNotifier().configured
+        st.markdown("#### Canali di notifica")
+        e1, e2 = st.columns(2)
+        e1.markdown(f"**Email** · {'Configurato' if email_ok else 'Non configurato'}")
+        e2.markdown(f"**SMS** · {'Configurato' if sms_ok else 'Non configurato'}")
+        if st.button("Invia allerte reali", icon=":material/send:", type="primary", use_container_width=True, disabled=not (email_ok or sms_ok)):
+            with loader("Invio notifiche", "Invio email e SMS…", "bar"):
+                ss.last_dispatch_result = ("live", dispatch_alerts(dry_run=False))
+        last = ss.get("last_dispatch_result")
+        if last:
+            mode, result = last
+            st.caption("Risultato simulazione" if mode == "dry_run" else "Risultato invio reale")
+            render_stat_chips([
+                ("Email inviate", result.get("sent_email", 0), "ok" if result.get("sent_email", 0) else "muted"),
+                ("SMS inviati", result.get("sent_sms", 0), "ok" if result.get("sent_sms", 0) else "muted"),
+                ("Già gestite", result.get("skipped", 0), "muted"),
+                ("Simulate", result.get("simulated", 0), "warn" if result.get("simulated", 0) else "muted"),
+                ("Fallite", result.get("failed", 0), "crit" if result.get("failed", 0) else "muted"),
+            ])
+        st.markdown("#### Registro scadenze attive")
+        if active:
+            df = pd.DataFrame(active)
+            cols = [c for c in ["due_date", "description", "module_id", "source_document", "source_page"] if c in df.columns]
+            df = df[cols].rename(columns={"due_date": "Data scadenza", "description": "Obbligo", "module_id": "Modulo", "source_document": "Documento", "source_page": "Pagina"})
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            if st.button("Svuota registro scadenze", icon=":material/delete_forever:", use_container_width=True, key="btn_clear_deadlines"):
+                n_removed = deactivate_all_deadlines()
+                ss.last_dispatch_result = None
+                ss.flash_msg = f"Registro scadenze svuotato · {n_removed} scadenze rimosse."
+                st.rerun()
+        else:
+            st.info("Nessuna scadenza attiva nel database.")
+        st.divider()
+        st.markdown("#### Destinatari")
+        r1, r2 = st.columns([2, 1])
+        with r1:
+            address = st.text_input("Email o numero di telefono", key="new_alert_addr")
+        with r2:
+            channel = st.selectbox("Canale", ["email", "sms"], key="new_alert_ch")
+        if st.button("Aggiungi destinatario", icon=":material/person_add:", use_container_width=True):
+            clean = address.strip()
+            valid = ("@" in clean and "." in clean) if channel == "email" else len(clean) >= 8
+            if not clean or not valid:
+                st.warning("Inserisci un indirizzo email o un numero di telefono valido.")
+            else:
+                import uuid
+                if add_recipient(str(uuid.uuid4()), channel, clean):
+                    st.success("Destinatario aggiunto.")
+                    st.rerun()
+                else:
+                    st.error("Impossibile salvare il destinatario.")
+        recipients = get_active_recipients()
+        if recipients:
+            st.dataframe(pd.DataFrame([{"Canale": r["channel"].upper(), "Destinatario": r["address"]} for r in recipients]), use_container_width=True, hide_index=True)
+            c_sel_rec, c_del_rec, c_clear_rec = st.columns([2.5, 1.2, 1.3], gap="small")
+            with c_sel_rec:
+                target_rec_id = st.selectbox(
+                    "Seleziona destinatario da rimuovere",
+                    options=[r["id"] for r in recipients],
+                    format_func=lambda rid: next(f"[{r['channel'].upper()}] {r['address']}" for r in recipients if r["id"] == rid),
+                    key="sel_remove_recipient",
+                    label_visibility="collapsed",
+                )
+            with c_del_rec:
+                if st.button("Rimuovi destinatario", icon=":material/delete:", use_container_width=True, key="btn_remove_recipient"):
+                    if target_rec_id and deactivate_recipient_by_id(target_rec_id):
+                        st.toast("Destinatario rimosso con successo.")
+                        st.rerun()
+            with c_clear_rec:
+                if st.button("Svuota tutti i destinatari", icon=":material/delete_forever:", use_container_width=True, key="btn_clear_all_recipients"):
+                    count = deactivate_all_recipients()
+                    st.toast(f"Tutti i destinatari sono stati rimossi ({count}).")
+                    st.rerun()
+        else:
+            st.info("Nessun destinatario configurato.")
 
 
 if __name__ == "__main__":

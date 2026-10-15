@@ -69,3 +69,55 @@ def test_dispatch_alerts_configured_mock(monkeypatch):
     stats = dispatch_alerts(today=date(2026, 10, 10), dry_run=False)
     assert stats["sent_email"] >= 1
     assert stats["failed"] == 0
+
+
+
+@pytest.mark.offline
+def test_deactivate_all_deadlines_clears_registry():
+    from app.alerts.store import deactivate_all_deadlines
+
+    upsert_deadline("d_clear_1", "m1", "s1", "f1", "Clear A", "2026-11-01", [30, 15, 7], "a.pdf", 1)
+    upsert_deadline("d_clear_2", "m1", "s1", "f1", "Clear B", "2026-12-01", [30, 15, 7], "b.pdf", 1)
+    assert len(get_active_deadlines()) >= 2
+
+    removed = deactivate_all_deadlines()
+    assert removed >= 2
+    assert get_active_deadlines() == []
+    assert deactivate_all_deadlines() == 0
+
+
+@pytest.mark.offline
+def test_recipient_deactivation_and_reactivation():
+    from app.alerts.store import (
+        get_active_recipients,
+        deactivate_recipient_by_id,
+        deactivate_recipient,
+        deactivate_all_recipients,
+    )
+
+    assert add_recipient("rx1", "email", "remove_me@company.it")
+    assert add_recipient("rx2", "sms", "+393330000001")
+    assert add_recipient("rx3", "email", "user3@company.it")
+    ids = {r["id"] for r in get_active_recipients()}
+    assert {"rx1", "rx2", "rx3"} <= ids
+
+    # Deactivate by ID
+    assert deactivate_recipient_by_id("rx1") is True
+    assert deactivate_recipient_by_id("rx1") is False
+    assert deactivate_recipient_by_id("does_not_exist") is False
+    ids = {r["id"] for r in get_active_recipients()}
+    assert "rx1" not in ids and "rx2" in ids
+
+    # Deactivate by address
+    assert deactivate_recipient("user3@company.it", "email") is True
+    assert deactivate_recipient("user3@company.it", "email") is False
+    assert "user3@company.it" not in {r["address"] for r in get_active_recipients()}
+
+    # Re-adding reactivates the row
+    assert add_recipient("rx1_new", "email", "remove_me@company.it")
+    assert "remove_me@company.it" in {r["address"] for r in get_active_recipients("email")}
+
+    # Bulk clear
+    assert deactivate_all_recipients() >= 2
+    assert get_active_recipients() == []
+    assert deactivate_all_recipients() == 0
