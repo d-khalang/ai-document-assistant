@@ -23,6 +23,8 @@ def _valid_iso_date(value: Any) -> bool:
 
 def normalize_field(fdef: FieldDef, raw_value: Any, ok_status: str = "EXTRACTED") -> Dict[str, Any]:
     """Deterministic per-field normalization driven by the declared type in JSON schema."""
+    if isinstance(raw_value, list):
+        raw_value = "\n".join(str(x) for x in raw_value if x is not None)
     if raw_value is None or str(raw_value).strip().lower() in _NULL_TOKENS:
         return {"raw_value": None, "normalized_value": None, "status": "MISSING"}
 

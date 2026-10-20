@@ -94,11 +94,33 @@
     },
     "regulatory_authorization": {
       "label": "Autorizzazioni e Titoli Abilitativi",
-      "description": "Autorizzazioni ambientali, iscrizioni Albo Gestori e codici EER.",
+      "description": "Autorizzazioni ambientali, iscrizioni Albo Gestori e codici EER. MANDATORY CONSOLIDATION RULE: Produce ONE SINGLE CONSOLIDATED RECORD for the entire authorization document by aggregating data across ALL pages, sections, and technical annexes (main Determina/provvedimento on initial pages, Sezione 1 & 1-bis for the complete list of EER codes and Fase 1 / Fase 2 storage and throughput quantities, main Determina + Sezione 4 for all time-bound prescriptions, and Sezione 3 for all numbered technical-management prescriptions). Never split a single authorization act into multiple partial records across pages.",
       "routing": {
           "strong_keywords": ["autorizzazion*", "albo gestori", "codice eer", "iscrizione albo", "provvediment*"],
           "keywords": ["rifiuti", "categoria", "r13", "provincia", "regione", "prescrizioni", "garanzie finanziarie", "mezzi autorizzati", "responsabile tecnico"]
         },
+      "layout": {
+        "sheet_title": "Dettagli File",
+        "report_title": "RAPPORTO DI AUTORIZZAZIONE E PRESCRIZIONI AMBIENTALI",
+        "word_header_fields": [
+          "numero_atto_protocollo",
+          "numero_iscrizione",
+          "ente_rilascio",
+          "data_rilascio",
+          "data_scadenza",
+          "attivita_autorizzate",
+          "mezzi_autorizzati"
+        ],
+        "word_table_fields": [
+          "elenco_codici_eer",
+          "quantitativi_movimentabili",
+          "quantitativi_deposito"
+        ],
+        "word_sections": [
+          {"title": "Prescrizioni con Scadenza", "field": "prescrizioni_con_scadenza", "style": "table"},
+          {"title": "Prescrizioni Tecnico-Gestionali e Discorsive", "field": "prescrizioni_tecnico_gestionali", "style": "list"}
+        ]
+      },
       "fields": {
         "numero_atto_protocollo": {"type": "string", "label": "N. Atto / Protocollo", "required": true, "description": "Numero identificativo autorizzazione"},
         "numero_iscrizione": {"type": "string", "label": "N. Iscrizione Albo / Registro", "description": "Numero iscrizione Albo es. TO15878"},
@@ -107,9 +129,13 @@
         "data_scadenza": {"type": "date", "label": "Data Scadenza Atto", "description": "Termine di validità dell'atto", "alert": {"thresholds_days": [180, 90, 30], "label_fields": ["numero_atto_protocollo", "ente_rilascio"]}},
         "attivita_autorizzate": {"type": "string", "label": "Attività e Categorie Autorizzate", "description": "Operazioni autorizzate: es. Categoria 4-E, R13, R4"},
         "mezzi_autorizzati": {"type": "string", "label": "Mezzi e Targhe Autorizzati", "description": "Targhe e tipologia mezzi autorizzati"},
-        "elenco_codici_eer": {"type": "string", "label": "Codici EER / Rifiuti Ammessi", "description": "Codici EER / CER ammessi"},
+        "elenco_codici_eer": {"type": "string", "label": "Codici EER / Rifiuti Ammessi", "description": "Complete consolidated list of all authorized Codici EER / CER across all pages and tables (e.g. Sezione 1 and Sezione 1-bis), comma-separated, without omitting any code."},
+        "quantitativi_movimentabili": {"type": "string", "label": "Quantitativi autorizzati movimentabili", "description": "Maximum authorized ANNUAL throughput of waste (t/a) consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). Copy verbatim with unit. If the document distinguishes Fase 1 / Fase 2 or per EER code/operation, report each as 'Fase 1: X t/a; Fase 2: Y t/a'. Never sum, convert or infer. null if absent."},
+        "quantitativi_deposito": {"type": "string", "label": "Quantitativi autorizzati in deposito", "description": "Maximum SIMULTANEOUS storage capacity on site (t) (messa in riserva/stoccaggio istantaneo) consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). Verbatim with unit, keep Fase 1 / Fase 2 split if present. Do NOT confuse with annual throughput. null if absent."},
         "responsabili_tecnici_note": {"type": "string", "label": "Responsabile Tecnico / Variazioni", "description": "Nomine o cessazioni incarico"},
-        "prescrizioni_rilevanti": {"type": "string", "label": "Prescrizioni / Condizioni Subordinanti", "description": "Garanzie finanziarie o prescrizioni"}
+        "prescrizioni_rilevanti": {"type": "string", "label": "Prescrizioni / Condizioni Subordinanti", "description": "ONLY financial guarantees and conditions not covered by the two prescription fields below."},
+        "prescrizioni_con_scadenza": {"type": "string", "label": "Prescrizioni con scadenza", "description": "All conditions with an explicit deadline/date/period consolidated from the entire document (both main Determina and technical annexes such as Sezione 4). ONE item per line (single string, items separated by newline). Format: '<verbatim text> || <deadline as written>'. null if none."},
+        "prescrizioni_tecnico_gestionali": {"type": "string", "label": "Prescrizioni tecnico-gestionali e discorsive", "description": "All continuous technical, safety and environmental conditions WITHOUT a specific deadline consolidated across all pages and annexes (e.g. all numbered items in Sezione 3). ONE item per line (single string, newline-separated), original order, verbatim/concise. null if none."}
       }
     }
   }

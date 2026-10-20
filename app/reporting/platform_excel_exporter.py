@@ -25,7 +25,7 @@ from openpyxl.utils import get_column_letter
 
 from app.alerts.deadlines import extract_deadlines_from_records
 from app.extraction.registry import SchemaDef, get_module, resolve_schema
-from app.reporting.common import cell_value, column_plan
+from app.reporting.common import cell_value, column_plan, sheet_title_for
 
 OK_STATUSES = ("EXTRACTED", "EDITED", "CALCULATED")
 MANUAL_SOURCES = ("", "manual", None)
@@ -496,8 +496,10 @@ def create_platform_excel_report(
             any_analytic = True
             schema = _schema_for(mid, sname)
             ftypes = {n: f.type for n, f in schema.fields.items()} if schema else {}
+            long_fields = {s["field"] for s in (schema.word_sections if schema else [])}
 
-            ws = wb.create_sheet(_unique_title(wb, f"Dati {sname.replace('_', ' ').title()}"))
+            fallback = f"Dati {sname.replace('_', ' ').title()}"
+            ws = wb.create_sheet(_unique_title(wb, sheet_title_for(schema, sname, fallback)))
             ws.freeze_panes = "A2"
             plan = column_plan(sname, mod_obj, records)
             _header(ws, ["Documento Fonte", "Pagina Fonte"] + [c[1] for c in plan] + ["Stato"])
@@ -515,7 +517,8 @@ def create_platform_excel_report(
                     st = fd.get("status")
                     fill = calc_fill if st == "CALCULATED" else edit_fill if st == "EDITED" else \
                         unc_fill if st == "UNCERTAIN" else None
-                    _put(ws, r_i, c, val if val is not None else "-", data_font, border=border, fill=fill)
+                    align = Alignment(wrap_text=True, vertical="top") if fname in long_fields else None
+                    _put(ws, r_i, c, val if val is not None else "-", data_font, align=align, border=border, fill=fill)
                 _put(ws, r_i, len(plan) + 3, _record_status(rec), data_font,
                      Alignment(horizontal="center"), border)
             _autofilter(ws)

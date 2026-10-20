@@ -4,7 +4,7 @@
 - **Current Milestone:** Step 8 Completed (Deterministic Auto-Routing, Batch Pipeline & Universal 4-Sheet Executive Report) 🟢
 - **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 20/20 Automated Pytest Test Suites Passing (100% Green).
+- **Test Suite Status:** 25/25 Automated Pytest Test Suites Passing (100% Green).
 
 ---
 
@@ -83,6 +83,7 @@
 - **پاکسازی یک‌کلیکی سررسیدها (`app/alerts/store.py` + `app/ui/streamlit_app.py`):** افزودن تابع `deactivate_all_deadlines()` (غیرفعال‌سازی نرم `active = 0` با حفظ کامل `alert_log` برای ممیزی)، تست آفلاین `test_deactivate_all_deadlines_clears_registry` و دکمه «Svuota registro scadenze» زیر جدول صفحه Scadenze & Allerte. تعداد تست‌ها: ۲۱/۲۱ سبز.
 - **مدیریت و حذف گیرندگان اعلان‌ها (`app/alerts/store.py` + `app/ui/streamlit_app.py`):** افزودن توابع `deactivate_recipient_by_id`, `deactivate_recipient` و `deactivate_all_recipients` برای حذف تکی و پاکسازی یکجای گیرندگان فعال، پیاده‌سازی کنترل‌های حذف و انتخابگر در رابط کاربری بخش Destinatari، پوشش تست جامع `test_recipient_deactivation_and_reactivation` در `tests/test_alerts.py`. مجموع تست‌های سیستم: ۲۲/۲۲ سبز (۱۰۰٪ پاس).
 - **مدرن‌سازی بصری و ارگونومی ناوبری سایدبار (`app/ui/theme.py`):** بازطراحی کامل استایل‌های `st.radio` در سایدبار به سبک Pill Tabs مدرن؛ فونت درشت‌تر (`1.15rem`، وزن ۶۰۰ تا ۷۵۰)، حذف دایره‌های رادیویی پیش‌فرض، موشن و شیفت افقی نرم هنگام Hover (`translateX(6px)` با سایه و پس‌زمینه ارگانیک `#EEF7E3`)، بردر و پس‌زمینه سبز شاخص برای تب فعال (`#E2F1D2` / `#8CC63F`) به همراه خط نشانگر عمودی (Accent line) و تست بدون خطای جابه‌جایی بین تمامی صفحات ۵‌گانه.
+- **ارتقای اسکیمای مجوزهای زیست‌محیطی (`regulatory_authorization`) و موتورهای گزارش‌گیری (`layout.sheet_title` & `layout.word_sections`):** افزودن فیلدهای ظرفیت (`quantitativi_movimentabili`, `quantitativi_deposito`) بلافاصله بعد از کدهای EER، تفکیک شروط به دو فیلد `prescrizioni_con_scadenza` و `prescrizioni_tecnico_gestionali`، قانون تجمیع کل صفحات سند در یک رکورد واحد (Consolidated Record)، پشتیبانی از `sheet_title` سفارشی (`Dettagli File`) در اکسل و بخش‌های پویای جدول ۴ ستونی (`||`) و لیست شماره‌دار در Word (`app/reporting/word_exporter.py`) به همراه دکمه دانلود مستقیم Word در کنار اکسل در صفحه اول. مجموع تست‌ها: ۲۵/۲۵ سبز (۱۰۰٪ پاس).
 
 
 ---
@@ -97,3 +98,6 @@
 ### Step 9 — Production Hardening & Multi-Tenant Authentication:
 - افزودن لایه احراز هویت سبک (Authentication) برای تفکیک امن نشست‌های کاربران سازمانی.
 - آماده‌سازی کانتینر Docker و پایپ‌لاین CI برای ارزیابی مداوم کیفیت.
+- [Phase 2 Architecture Task] ارتقای استخراج شروط دارای مهلت (prescrizioni_con_scadenza) از حالت تک‌رشته متنی به ساختار اسکیمای فرزند (Child Schema) با رکوردهای مجزا و فیلد تاریخ‌دار رسمی برای اتصال مستقیم به موتور هشدارهای تقویمی deadlines (نیازمند پشتیبانی چنداسکیمایی در build_routing_plan).
+
+- [Phase 2 Architecture Task] ارتقای استخراج شروط دارای مهلت (prescrizioni_con_scadenza) از حالت تک‌رشته متنی به ساختار اسکیمای فرزند (Child Schema) با رکوردهای مجزا و فیلد تاریخ‌دار رسمی برای اتصال مستقیم به موتور هشدارهای تقویمی deadlines (نیازمند پشتیبانی چنداسکیمایی در build_routing_plan).

@@ -47,6 +47,27 @@ class SchemaDef:
     fields: Dict[str, FieldDef]
     computed: Dict[str, ComputedDef] = field(default_factory=dict)
     routing: Dict[str, Any] = field(default_factory=dict)
+    layout: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def sheet_title(self) -> Optional[str]:
+        return self.layout.get("sheet_title")
+
+    @property
+    def report_title(self) -> str:
+        return self.layout.get("report_title") or "RAPPORTO DI CONFORMITÀ E AUDIT"
+
+    @property
+    def word_header_fields(self) -> List[str]:
+        return self.layout.get("word_header_fields") or []
+
+    @property
+    def word_table_fields(self) -> List[str]:
+        return self.layout.get("word_table_fields") or []
+
+    @property
+    def word_sections(self) -> List[Dict[str, Any]]:
+        return self.layout.get("word_sections") or []
 
     @property
     def required(self) -> List[str]:
@@ -116,7 +137,19 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         if not all(isinstance(k, str) for k in routing.get(key, [])):
             raise ValueError(f"{src}: {name}.routing.{key} must be a list of strings")
 
-    return SchemaDef(name, module_id, raw.get("label") or name, raw.get("description", ""), fields, computed, routing)
+    layout = raw.get("layout") or {}
+    st_title = layout.get("sheet_title")
+    if st_title and (len(st_title) > 31 or any(c in st_title for c in '[]:*?/\\')):
+        raise ValueError(f"{src}: {name}.layout.sheet_title invalid for Excel")
+    for list_key in ("word_header_fields", "word_table_fields"):
+        for fname in layout.get(list_key, []):
+            if fname not in fields and fname not in computed:
+                raise ValueError(f"{src}: {name}.layout.{list_key} unknown field '{fname}'")
+    for sec in layout.get("word_sections", []):
+        if sec.get("field") not in fields or sec.get("style") not in ("table", "list"):
+            raise ValueError(f"{src}: {name}.layout.word_sections invalid: {sec}")
+
+    return SchemaDef(name, module_id, raw.get("label") or name, raw.get("description", ""), fields, computed, routing, layout=layout)
 
 @lru_cache(maxsize=1)
 def load_registry() -> Dict[str, ModuleDef]:

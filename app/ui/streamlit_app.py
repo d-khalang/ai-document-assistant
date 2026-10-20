@@ -71,8 +71,8 @@ from app.config import RAG_TOP_K
 from app.database.database import (
     init_db,
     create_user,
-    create_document,
     create_conversation,
+    create_document,
     save_message,
     get_conversation_history,
     get_company_profile,
@@ -299,14 +299,41 @@ def render_platform_pipeline(preferred_module: str) -> None:
 
         if ss.platform_xlsx:
             data, ts = ss.platform_xlsx
-            st.download_button(
-                label=f"Scarica Fascicolo Gestionale Completo (.xlsx) — {ts:%H:%M:%S}",
-                icon=":material/download:",
-                data=data,
-                file_name=f"Report_Gestionale_Completo_{ts:%Y%m%d_%H%M}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+            target_mid = preferred_module
+            if not any(v.get("records") for v in build_export_payload(target_mid).values()):
+                for cand_mid in ss.extracted_data:
+                    if any(v.get("records") for v in build_export_payload(cand_mid).values()):
+                        target_mid = cand_mid
+                        break
+            mod_obj = get_module(target_mid)
+            prefix = mod_obj.report.get("filename_prefix", "REPORT")
+            word_payload = build_export_payload(target_mid)
+            word_bytes = create_styled_word_report(
+                extracted_data_by_schema=word_payload,
+                source_documents=list(docs),
+                company_profile=ss.company_profile,
+                selected_fields_by_schema=ss.export_fields.get(target_mid, {}),
+                module_id=target_mid,
             )
+            c_dl_xlsx, c_dl_docx = st.columns(2)
+            with c_dl_xlsx:
+                st.download_button(
+                    label=f"Scarica Fascicolo Gestionale Completo (.xlsx) — {ts:%H:%M:%S}",
+                    icon=":material/download:",
+                    data=data,
+                    file_name=f"Report_Gestionale_Completo_{ts:%Y%m%d_%H%M}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+            with c_dl_docx:
+                st.download_button(
+                    label=f"Scarica Report Word ({prefix}) — {ts:%H:%M:%S}",
+                    icon=":material/description:",
+                    data=word_bytes,
+                    file_name=f"Verbale_{prefix}_{ts:%Y%m%d_%H%M}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                )
 
 
 
@@ -536,7 +563,19 @@ def render_ui():
         if not schemas:
             st.warning("Nessuno schema disponibile per il modulo selezionato.")
             return
-        schema_name = st.selectbox("Schema di estrazione", schemas, format_func=lambda s: f"{current_module.schemas[s].label} — {current_module.schemas[s].description}", key=f"schema_select_{mid}")
+        default_schema_idx = 0
+        mod_extracted = ss.extracted_data.get(mid, {})
+        for idx, s in enumerate(schemas):
+            if mod_extracted.get(s, {}).get("records"):
+                default_schema_idx = idx
+                break
+        schema_name = st.selectbox(
+            "Schema di estrazione",
+            schemas,
+            index=default_schema_idx,
+            format_func=lambda s: f"{current_module.schemas[s].label} — {current_module.schemas[s].description.split('.')[0]}.",
+            key=f"schema_select_{mid}",
+        )
         schema = current_module.schemas[schema_name]
         if not ss.indexed_documents:
             st.info("Carica prima i documenti dalla pagina Document Hub.")

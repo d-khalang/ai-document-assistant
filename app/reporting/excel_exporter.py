@@ -10,6 +10,7 @@ from app.reporting.common import (
     report_meta,
     column_plan,
     cell_value,
+    sheet_title_for,
     COLUMN_LABELS
 )
 
@@ -24,7 +25,7 @@ def create_styled_excel_report(
     """
     تولید فایل اکسل تجاری با تفکیک قطعی ماژول (Scoped Reporting).
     """
-    # ۱. اعمال فیلتر اسکوپ: فقط اسکیماهای مرتبط با ماژول فعال باقی می‌مانند
+    # ۱. اعمال فیلتر اسکوپ: فقط اسکیماهای مرتبط با ماژول جاری باقی می‌مانند
     module, scoped_data = resolve_scope(extracted_data_by_schema, module_id)
     meta = report_meta(module)
 
@@ -93,6 +94,8 @@ def create_styled_excel_report(
     row_idx += 1
     for schema_name, data in scoped_data.items():
         recs = data.get("records", [])
+        schema_obj = module.schemas.get(schema_name) if module else None
+        dedicated_sheet = sheet_title_for(schema_obj, schema_name, schema_name.upper())[:31]
         
         # محاسبه واقعی وضعیت بر اساس داده‌ها
         has_uncertain = any("uncertain_required" in str(r.get("warnings", [])) for r in recs)
@@ -108,12 +111,14 @@ def create_styled_excel_report(
         ws_summary.cell(row=row_idx, column=1, value=schema_name.upper()).font = data_font
         ws_summary.cell(row=row_idx, column=2, value=len(recs)).font = data_font
         ws_summary.cell(row=row_idx, column=3, value=status_desc).font = data_font
-        ws_summary.cell(row=row_idx, column=4, value=schema_name.upper()).font = data_font
+        ws_summary.cell(row=row_idx, column=4, value=dedicated_sheet).font = data_font
         row_idx += 1
 
     # شیت‌های اختصاصی برای اسکیماهای معتبر
     for schema_name, data in scoped_data.items():
-        sheet_title = schema_name.upper()[:31]
+        schema_obj = module.schemas.get(schema_name) if module else None
+        sheet_title = sheet_title_for(schema_obj, schema_name, schema_name.upper())[:31]
+        long_fields = {s["field"] for s in (schema_obj.word_sections if schema_obj else [])}
         ws = wb.create_sheet(title=sheet_title)
         ws.views.sheetView[0].showGridLines = True
         ws.freeze_panes = "A2"
@@ -171,7 +176,9 @@ def create_styled_excel_report(
                 elif f_status == "EDITED":
                     cell.fill = edited_fill
 
-                if any(k in fname for k in ["data", "scadenza", "targa", "periodo"]):
+                if fname in long_fields:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                elif any(k in fname for k in ["data", "scadenza", "targa", "periodo"]):
                     cell.alignment = Alignment(horizontal="center")
 
             st_cell = ws.cell(row=r_idx, column=len(headers), value=row_status)
@@ -189,7 +196,7 @@ def create_styled_excel_report(
                 val_str = str(cell.value or "")
                 if len(val_str) > max_len:
                     max_len = len(val_str)
-            ws_item.column_dimensions[col_letter].width = max(max_len + 4, 15)
+            ws_item.column_dimensions[col_letter].width = min(max(max_len + 4, 15), 60)
 
     output = io.BytesIO()
     wb.save(output)

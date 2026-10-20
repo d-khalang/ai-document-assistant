@@ -16,6 +16,23 @@ GENERIC_REPORT = {
     ],
 }
 
+_EMPTY_TOKENS = {"", "-", "null", "none", "n/a"}
+
+
+def split_items(val: Any, sep: str = "\n") -> List[str]:
+    s = "" if val is None else str(val).strip()
+    if s.lower() in _EMPTY_TOKENS:
+        return []
+    return [
+        p.strip(" -•\t")
+        for p in s.split(sep)
+        if p.strip(" -•\t") and p.strip(" -•\t").lower() not in _EMPTY_TOKENS
+    ]
+
+
+def sheet_title_for(schema: Optional[SchemaDef], sname: str, fallback: str) -> str:
+    return (schema.sheet_title if schema and schema.sheet_title else fallback)
+
 
 def resolve_scope(
     data_by_schema: Dict[str, Any],
