@@ -78,15 +78,32 @@
           "strong_keywords": ["attest*", "corso di formazione", "81/08", "ente formatore"],
           "keywords": ["aggiornament*", "rspp", "antincendio", "primo soccorso", "carrellist*", "lavorator*", "ore di formazione", "rlsr", "abilitazion*"]
         },
+      "derived_dates": {
+        "data_scadenza_rinnovo": {
+          "base_field": "data_emissione",
+          "text_fields": ["corso_descrizione", "ruolo_corso", "riferimento_normativo"],
+          "default_months": null,
+          "rules": [
+            {"id": "preposto", "keywords": ["prepost*"], "months": 24, "priority": 20, "ref": "Accordo S-R (rev. D.Lgs. 81/08)"},
+            {"id": "dirigente", "keywords": ["dirigent*"], "months": 60, "priority": 20, "ref": "Accordo S-R 21/12/2011"},
+            {"id": "attrezzature", "keywords": ["carrell*", "ple", "gru", "movimento terra", "art 73"], "months": 60, "priority": 20, "ref": "art. 73 c.5 D.Lgs. 81/08"},
+            {"id": "antincendio", "keywords": ["antincendio", "dm 02 09 2021"], "months": 60, "priority": 20, "ref": "DM 02/09/2021"},
+            {"id": "primo_soccorso", "keywords": ["primo soccorso", "388 2003"], "months": 36, "priority": 20, "ref": "DM 388/2003"},
+            {"id": "formazione_generale", "keywords": ["formazione generale"], "months": null, "priority": 15, "ref": "nessuna scadenza"},
+            {"id": "lavoratore", "keywords": ["lavorator*", "formazione specifica"], "months": 60, "priority": 10, "ref": "Accordo S-R 21/12/2011"}
+          ]
+        }
+      },
       "fields": {
         "nominativo_dipendente": {"type": "string", "label": "Dipendente / Collaboratore", "required": true, "description": "Nome e cognome lavoratore"},
         "codice_fiscale": {"type": "string", "label": "Codice Fiscale", "description": "Codice Fiscale lavoratore"},
-        "corso_descrizione": {"type": "string", "label": "Titolo Corso / Abilitazione", "required": true, "description": "Titolo del corso"},
+        "corso_descrizione": {"type": "string", "label": "Titolo Corso / Abilitazione", "required": true, "description": "Titolo completo del corso o abilitazione copiato testualmente dal documento (es. Corso Carrellisti, Aggiornamento Preposti, Primo Soccorso)"},
+        "ruolo_corso": {"type": "string", "label": "Ruolo / Mansione Formazione", "description": "Ruolo o qualifica formativa (es. Lavoratore, Preposto, Dirigente, RSPP, RLS, Antincendio, Primo Soccorso, Carrellista). null se non esplicitato"},
         "riferimento_normativo": {"type": "string", "label": "Riferimento Normativo", "description": "Articoli D.Lgs. 81/08"},
         "numero_protocollo": {"type": "string", "label": "N. Protocollo Attestato", "description": "Identificativo attestato"},
         "ente_formatore": {"type": "string", "label": "Ente Formatore / CFPT", "description": "Soggetto formatore accreditato"},
-        "data_emissione": {"type": "date", "label": "Data Attestato", "required": true, "description": "Data attestato o superamento corso"},
-        "data_scadenza_rinnovo": {"type": "date", "label": "Scadenza Aggiornamento", "description": "Termine aggiornamento obbligatorio", "alert": {"thresholds_days": [60, 30, 15], "label_fields": ["nominativo_dipendente", "corso_descrizione"]}},
+        "data_emissione": {"type": "date", "label": "Data Attestato", "required": true, "description": "Data di emissione o superamento del corso copiata esattamente come scritta. null se assente"},
+        "data_scadenza_rinnovo": {"type": "date", "label": "Scadenza Aggiornamento", "description": "Data di scadenza o rinnovo SOLO se espressamente stampata nel documento. NON calcolare né indovinare: se non scritta esplicitamente restituisci null (il sistema calcolerà la scadenza deterministicamente)", "alert": {"thresholds_days": [60, 30, 15], "label_fields": ["nominativo_dipendente", "corso_descrizione"]}},
         "frequenza_anni": {"type": "number", "label": "Frequenza (Anni)", "description": "Frequenza aggiornamento in anni"},
         "ore_formazione": {"type": "number", "label": "Durata (Ore)", "description": "Durata corso in ore"},
         "stato_validita": {"type": "string", "label": "Validità", "description": "Valido, In scadenza, Scaduto"}

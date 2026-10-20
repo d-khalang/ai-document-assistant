@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -96,3 +97,17 @@ def normalize_plate(plate_str: Optional[str]) -> Optional[str]:
     if not plate_str:
         return None
     return re.sub(r"[\s\-_]", "", str(plate_str)).upper()
+
+
+def normalize_key(text: str) -> str:
+    s = unicodedata.normalize("NFKD", text or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    return re.sub(r"[\s_\-\./]+", " ", s).strip()
+
+
+def keyword_matches(term: str, text: str) -> bool:
+    t = normalize_key(term)
+    prefix = t.endswith("*")
+    body = re.escape(t.rstrip("*").strip())
+    return re.search(r"(?<![a-z0-9])" + body + ("" if prefix else r"(?![a-z0-9])"),
+                     normalize_key(text)) is not None

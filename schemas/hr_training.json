@@ -23,6 +23,25 @@
         "strong_keywords": ["attest*", "corso di formazione", "81/08", "ente formatore"],
         "keywords": ["aggiornament*", "rspp", "antincendio", "primo soccorso", "carrellist*", "lavorator*", "ore di formazione", "rlsr", "abilitazion*"]
       },
+      "layout": {
+        "sheet_title": "Attestati Formazione"
+      },
+      "derived_dates": {
+        "data_scadenza": {
+          "base_field": "data_emissione",
+          "text_fields": ["titolo_corso", "ruolo_corso", "riferimento_normativo"],
+          "default_months": null,
+          "rules": [
+            {"id": "preposto", "keywords": ["prepost*"], "months": 24, "priority": 20, "ref": "Accordo S-R (rev. D.Lgs. 81/08)"},
+            {"id": "dirigente", "keywords": ["dirigent*"], "months": 60, "priority": 20, "ref": "Accordo S-R 21/12/2011"},
+            {"id": "attrezzature", "keywords": ["carrell*", "ple", "gru", "movimento terra", "art 73"], "months": 60, "priority": 20, "ref": "art. 73 c.5 D.Lgs. 81/08"},
+            {"id": "antincendio", "keywords": ["antincendio", "dm 02 09 2021"], "months": 60, "priority": 20, "ref": "DM 02/09/2021"},
+            {"id": "primo_soccorso", "keywords": ["primo soccorso", "388 2003"], "months": 36, "priority": 20, "ref": "DM 388/2003"},
+            {"id": "formazione_generale", "keywords": ["formazione generale"], "months": null, "priority": 15, "ref": "nessuna scadenza"},
+            {"id": "lavoratore", "keywords": ["lavorator*", "formazione specifica"], "months": 60, "priority": 10, "ref": "Accordo S-R 21/12/2011"}
+          ]
+        }
+      },
       "fields": {
         "nominativo_dipendente": {
           "type": "string",
@@ -36,6 +55,16 @@
           "required": true,
           "description": "Denominazione del corso es. Formazione Generale, Antincendio, Carrellisti, RLS"
         },
+        "ruolo_corso": {
+          "type": "string",
+          "label": "Ruolo / Mansione Formazione",
+          "description": "Ruolo o qualifica formativa (es. Lavoratore, Preposto, Dirigente, RSPP, RLS, Antincendio, Primo Soccorso, Carrellista). null se non esplicitato"
+        },
+        "riferimento_normativo": {
+          "type": "string",
+          "label": "Riferimento Normativo",
+          "description": "Articoli D.Lgs. 81/08 o Accordi Stato-Regioni citati nell'attestato"
+        },
         "ente_formatore": {
           "type": "string",
           "label": "Ente Formatore",
@@ -45,12 +74,12 @@
           "type": "date",
           "label": "Data Rilascio Attestato",
           "required": true,
-          "description": "Data di superamento o rilascio dell'attestato"
+          "description": "Data di superamento o rilascio dell'attestato copiata esattamente come scritta. null se assente"
         },
         "data_scadenza": {
           "type": "date",
           "label": "Data Scadenza / Rinnovo",
-          "description": "Data entro cui effettuare l'aggiornamento periodico obbligatorio",
+          "description": "Data di scadenza o rinnovo SOLO se espressamente stampata nel documento. NON calcolare né indovinare: se non scritta esplicitamente restituisci null (il sistema calcolerà la scadenza deterministicamente)",
           "alert": {
             "thresholds_days": [90, 60, 30, 15, 7],
             "label_fields": ["nominativo_dipendente", "titolo_corso"]

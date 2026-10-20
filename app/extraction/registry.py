@@ -39,6 +39,24 @@ class ComputedDef:
 
 
 @dataclass
+class ExpiryRule:
+    id: str
+    keywords: List[str]
+    months: Optional[int]
+    priority: int = 0
+    ref: str = ""
+
+
+@dataclass
+class DerivedDateDef:
+    target: str
+    base_field: str
+    text_fields: List[str]
+    rules: List[ExpiryRule]
+    default_months: Optional[int] = None
+
+
+@dataclass
 class SchemaDef:
     name: str
     module_id: str
@@ -48,6 +66,7 @@ class SchemaDef:
     computed: Dict[str, ComputedDef] = field(default_factory=dict)
     routing: Dict[str, Any] = field(default_factory=dict)
     layout: Dict[str, Any] = field(default_factory=dict)
+    derived: Dict[str, DerivedDateDef] = field(default_factory=dict)
 
     @property
     def sheet_title(self) -> Optional[str]:
@@ -149,7 +168,63 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         if sec.get("field") not in fields or sec.get("style") not in ("table", "list"):
             raise ValueError(f"{src}: {name}.layout.word_sections invalid: {sec}")
 
-    return SchemaDef(name, module_id, raw.get("label") or name, raw.get("description", ""), fields, computed, routing, layout=layout)
+    raw_derived = raw.get("derived_dates") or {}
+    derived: Dict[str, DerivedDateDef] = {}
+    for target_name, dconf in raw_derived.items():
+        if target_name not in fields or fields[target_name].type != "date":
+            raise ValueError(f"{src}: {name}.derived_dates target '{target_name}' must be an existing date field")
+        base_field = dconf.get("base_field")
+        if base_field not in fields or fields[base_field].type != "date":
+            raise ValueError(f"{src}: {name}.derived_dates base_field '{base_field}' must be an existing date field")
+        text_fields = dconf.get("text_fields") or []
+        for tf in text_fields:
+            if tf not in fields:
+                raise ValueError(f"{src}: {name}.derived_dates text_field '{tf}' not in fields")
+
+        rules_list: List[ExpiryRule] = []
+        rule_ids = set()
+        for r in dconf.get("rules", []):
+            rid = r.get("id")
+            if not rid or rid in rule_ids:
+                raise ValueError(f"{src}: {name}.derived_dates rule id duplicate or missing: '{rid}'")
+            rule_ids.add(rid)
+            kw = r.get("keywords") or []
+            if not kw or not all(isinstance(k, str) for k in kw):
+                raise ValueError(f"{src}: {name}.derived_dates rule '{rid}' keywords must be non-empty list of strings")
+            m = r.get("months")
+            if m is not None and (not isinstance(m, int) or m <= 0):
+                raise ValueError(f"{src}: {name}.derived_dates rule '{rid}' months must be positive int or null")
+            rules_list.append(ExpiryRule(
+                id=rid,
+                keywords=kw,
+                months=m,
+                priority=int(r.get("priority", 0)),
+                ref=str(r.get("ref", ""))
+            ))
+
+        def_m = dconf.get("default_months")
+        if def_m is not None and (not isinstance(def_m, int) or def_m <= 0):
+            raise ValueError(f"{src}: {name}.derived_dates default_months must be positive int or null")
+
+        derived[target_name] = DerivedDateDef(
+            target=target_name,
+            base_field=base_field,
+            text_fields=text_fields,
+            rules=rules_list,
+            default_months=def_m
+        )
+
+    return SchemaDef(
+        name,
+        module_id,
+        raw.get("label") or name,
+        raw.get("description", ""),
+        fields,
+        computed,
+        routing,
+        layout=layout,
+        derived=derived
+    )
 
 @lru_cache(maxsize=1)
 def load_registry() -> Dict[str, ModuleDef]:

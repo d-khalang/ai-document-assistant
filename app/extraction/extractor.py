@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from app.ai.gemini import generate_structured_json
-from app.extraction.calculators import compute_value
+from app.extraction.calculators import compute_value, compute_expiry_date
 from app.extraction.normalizer import normalize_date, normalize_number, normalize_plate
 from app.extraction.registry import FieldDef, SchemaDef, get_module, resolve_schema
 
@@ -59,6 +59,32 @@ def apply_computed(schema: SchemaDef, fields: Dict[str, Any]) -> None:
             }
 
 
+def apply_derived_dates(schema: SchemaDef, fields: Dict[str, Any]) -> List[str]:
+    warns = []
+    for target, d in schema.derived.items():
+        # مقدار چاپ‌شده یا ویرایش دستی هرگز overwrite نمی‌شود
+        if (fields.get(target) or {}).get("status") in ("EXTRACTED", "EDITED", "UNCERTAIN"):
+            continue
+        base = fields.get(d.base_field) or {}
+        base_iso = base.get("normalized_value") if base.get("status") in ("EXTRACTED", "EDITED") else None
+        text = " ".join(
+            str((fields.get(f) or {}).get("normalized_value") or (fields.get(f) or {}).get("raw_value") or "")
+            for f in d.text_fields
+        )
+        res = compute_expiry_date(base_iso, text, d.rules, d.default_months)
+        if res.iso_date:
+            fields[target] = {
+                "raw_value": f"{res.iso_date} ({res.months} mesi · {res.rule_id})",
+                "normalized_value": res.iso_date,
+                "status": "CALCULATED",
+            }
+        else:
+            fields[target] = {"raw_value": None, "normalized_value": None, "status": "MISSING"}
+            if res.reason in ("ambiguous", "no_rule"):
+                warns.append(f"derived_{res.reason}:{target}")
+    return warns
+
+
 def required_warnings(schema: SchemaDef, fields: Dict[str, Any]) -> List[str]:
     out = []
     for n in schema.required:
@@ -72,7 +98,8 @@ def required_warnings(schema: SchemaDef, fields: Dict[str, Any]) -> List[str]:
 
 def finalize_record(schema: SchemaDef, fields: Dict[str, Any]) -> List[str]:
     apply_computed(schema, fields)
-    return required_warnings(schema, fields)
+    derived_warns = apply_derived_dates(schema, fields)
+    return required_warnings(schema, fields) + derived_warns
 
 
 def _build_prompt(schema: SchemaDef, pages: List[Dict[str, Any]], doc_name: str) -> str:
