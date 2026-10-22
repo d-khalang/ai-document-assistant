@@ -316,3 +316,20 @@ def test_personnel_training_derived_dates_integration():
     finalize_record(schema, fields4)
     assert fields4["data_scadenza_rinnovo"]["status"] == "MISSING"
     assert fields4["data_scadenza_rinnovo"]["normalized_value"] is None
+
+
+@pytest.mark.offline
+def test_chat_guidelines_schema_validation():
+    fields = {"corso": {"type": "string", "label": "Corso"}}
+
+    parsed = _parse_schema("m", "s", {"fields": fields, "chat": {"guidelines": ["  Regola di dominio.  "]}}, "test.json")
+    assert parsed.chat_guidelines == ["Regola di dominio."]
+    assert _parse_schema("m", "s", {"fields": fields}, "test.json").chat_guidelines == []
+
+    for bad in ("non una lista", [""], [42]):
+        with pytest.raises(ValueError, match="chat.guidelines must be a list of non-empty strings"):
+            _parse_schema("m", "s", {"fields": fields, "chat": {"guidelines": bad}}, "test.json")
+
+    # Training schemas declare their domain wording in JSON, not in the generic prompt
+    for mid, sname in (("hr_training", "training_certificate"), ("iso_14001", "personnel_training")):
+        assert any("senza scadenza" in g for g in resolve_schema(sname, mid).chat_guidelines)

@@ -26,6 +26,11 @@
       "layout": {
         "sheet_title": "Attestati Formazione"
       },
+      "chat": {
+        "guidelines": [
+          "Se un corso risulta senza scadenza (es. formazione generale con credito permanente), chiarisci che per legge la formazione non è soggetta ad aggiornamento periodico."
+        ]
+      },
       "derived_dates": {
         "data_scadenza": {
           "base_field": "data_emissione",

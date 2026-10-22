@@ -97,7 +97,7 @@ Domain logic resides entirely in external JSON files (`schemas/*.json`):
 | **Vector Store** | ChromaDB | Persistent local vector store configured with Cosine similarity |
 | **Relational Database** | SQLite (`sqlite3`) | Users, conversations, company tenant profiles, deadlines, and alert logs (WAL mode) |
 | **Document Parsers** | `pypdf`, `pymupdf`, `python-docx`, `pandas`, `openpyxl`, `Pillow` | Robust multimodal and spreadsheet ingestors |
-| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (20/20 passing) |
+| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (41/41 passing) |
 
 ---
 
@@ -260,30 +260,51 @@ rootdir: D:\ai-document-assistant
 configfile: pytest.ini
 testpaths: tests
 plugins: anyio-4.15.1
-collected 20 items
+collected 41 items
 
-tests/test_alerts.py::test_alert_engine_full PASSED                      [  5%]
-tests/test_alerts.py::test_scan_deadlines_max_overdue_days PASSED        [ 10%]
-tests/test_alerts.py::test_dispatch_alerts_configured_mock PASSED        [ 15%]
-tests/test_config.py::test_default_config_values PASSED                  [ 20%]
-tests/test_config.py::test_dynamic_db_path PASSED                        [ 25%]
-tests/test_config.py::test_chunker_uses_config PASSED                    [ 30%]
-tests/test_database.py::test_database_lifecycle PASSED                   [ 35%]
-tests/test_database.py::test_company_profile PASSED                      [ 40%]
-tests/test_pipeline.py::test_routing_is_deterministic_and_overridable_by_tiebreak PASSED [ 45%]
-tests/test_pipeline.py::test_batch_run_merge_idempotence_and_eviction PASSED [ 50%]
-tests/test_pipeline.py::test_stale_deadline_deactivated_when_record_changes PASSED [ 55%]
-tests/test_pipeline.py::test_unconfigured_notifier_is_not_logged_as_sent PASSED [ 60%]
-tests/test_pipeline.py::test_exporter_explains_unanalyzed_documents PASSED [ 65%]
-tests/test_platform_excel.py::test_platform_excel_4_sheets_structure PASSED [ 70%]
-tests/test_registry.py::test_schema_registry_loading PASSED              [ 75%]
-tests/test_registry.py::test_legacy_shim PASSED                          [ 80%]
-tests/test_registry.py::test_deterministic_calculators PASSED            [ 85%]
-tests/test_registry.py::test_date_and_field_normalizers PASSED           [ 90%]
-tests/test_reports.py::test_scoped_reporting_isolation PASSED            [ 95%]
-tests/test_review.py::test_review_roundtrip PASSED                       [100%]
+tests/test_alerts.py::test_alert_engine_full PASSED                      [  2%]
+tests/test_alerts.py::test_scan_deadlines_max_overdue_days PASSED        [  4%]
+tests/test_alerts.py::test_dispatch_alerts_configured_mock PASSED        [  7%]
+tests/test_alerts.py::test_deactivate_all_deadlines_clears_registry PASSED [  9%]
+tests/test_alerts.py::test_recipient_deactivation_and_reactivation PASSED [ 12%]
+tests/test_config.py::test_default_config_values PASSED                  [ 14%]
+tests/test_config.py::test_dynamic_db_path PASSED                        [ 17%]
+tests/test_config.py::test_chunker_uses_config PASSED                    [ 19%]
+tests/test_database.py::test_database_lifecycle PASSED                   [ 21%]
+tests/test_database.py::test_company_profile PASSED                      [ 24%]
+tests/test_document_chat_context.py::test_build_document_structured_context_extracted_and_calculated PASSED [ 26%]
+tests/test_document_chat_context.py::test_build_document_structured_context_with_live_calculation PASSED [ 29%]
+tests/test_document_chat_context.py::test_build_document_structured_context_empty_and_edge_cases PASSED [ 31%]
+tests/test_document_chat_context.py::test_build_document_structured_context_multiple_records PASSED [ 34%]
+tests/test_document_chat_context.py::test_build_rag_prompt_with_structured_context_and_provenance_rules PASSED [ 36%]
+tests/test_document_chat_context.py::test_build_chat_structured_context_filters_active_documents_and_collects_guidelines PASSED [ 39%]
+tests/test_document_chat_context.py::test_build_chat_structured_context_edge_cases PASSED [ 41%]
+tests/test_pipeline.py::test_routing_is_deterministic_and_overridable_by_tiebreak PASSED [ 43%]
+tests/test_pipeline.py::test_batch_run_merge_idempotence_and_eviction PASSED [ 46%]
+tests/test_pipeline.py::test_stale_deadline_deactivated_when_record_changes PASSED [ 48%]
+tests/test_pipeline.py::test_unconfigured_notifier_is_not_logged_as_sent PASSED [ 51%]
+tests/test_pipeline.py::test_exporter_explains_unanalyzed_documents PASSED [ 53%]
+tests/test_platform_excel.py::test_platform_excel_4_sheets_structure PASSED [ 56%]
+tests/test_platform_excel.py::test_platform_excel_regulatory_authorization_sheet_title_and_columns PASSED [ 58%]
+tests/test_registry.py::test_schema_registry_loading PASSED              [ 60%]
+tests/test_registry.py::test_legacy_shim PASSED                          [ 63%]
+tests/test_registry.py::test_deterministic_calculators PASSED            [ 65%]
+tests/test_registry.py::test_compute_expiry_date_and_leap_year PASSED    [ 68%]
+tests/test_registry.py::test_date_and_field_normalizers PASSED           [ 70%]
+tests/test_registry.py::test_regulatory_authorization_layout_and_fields PASSED [ 73%]
+tests/test_registry.py::test_derived_dates_schema_validation PASSED      [ 75%]
+tests/test_registry.py::test_personnel_training_derived_dates_integration PASSED [ 78%]
+tests/test_registry.py::test_chat_guidelines_schema_validation PASSED    [ 80%]
+tests/test_reports.py::test_scoped_reporting_isolation PASSED            [ 82%]
+tests/test_reports.py::test_word_report_regulatory_authorization_sections_and_empty_safety PASSED [ 85%]
+tests/test_review.py::test_review_roundtrip PASSED                       [ 87%]
+tests/test_training_expiry.py::test_training_expiry_rules_and_leap_year PASSED [ 90%]
+tests/test_training_expiry.py::test_training_expiry_preserves_extracted_and_edited PASSED [ 92%]
+tests/test_training_expiry.py::test_training_expiry_integration_with_deadline_alerts PASSED [ 95%]
+tests/test_training_expiry.py::test_training_expiry_edge_cases_and_warnings PASSED [ 97%]
+tests/test_training_expiry.py::test_hr_training_certificate_schema_derived_dates PASSED [100%]
 
-============================= 20 passed in 2.86s ==============================
+============================= 41 passed in 3.40s ==============================
 ```
 
 ---

@@ -1,5 +1,14 @@
-from typing import List, Dict, Any, Optional
-from app.extraction.registry import SchemaDef
+import os
+from dataclasses import dataclass
+from typing import List, Dict, Any, Iterable, Optional, Tuple
+from app.extraction.registry import SchemaDef, resolve_schema
+
+
+@dataclass(frozen=True)
+class ChatStructuredContext:
+    """کانتکست ساختاریافته چت: متن داده‌ها (DOCUMENT CONTEXT) و راهنمای دامنه (دستورالعمل) به‌صورت جدا."""
+    text: str = ""
+    guidelines: Tuple[str, ...] = ()
 
 
 def build_document_structured_context(schema: Optional[SchemaDef], records: Optional[List[Any]]) -> str:
@@ -99,14 +108,57 @@ def build_document_structured_context(schema: Optional[SchemaDef], records: Opti
     return "\n".join(lines)
 
 
+def _is_active_document(source_document: Any, active_documents: set) -> bool:
+    src = str(source_document or "").strip()
+    return any(src == a or os.path.basename(src) == os.path.basename(a) for a in active_documents)
+
+
+def build_chat_structured_context(
+    payload: Optional[Dict[str, Dict[str, Any]]],
+    active_documents: Optional[Iterable[str]] = None
+) -> ChatStructuredContext:
+    """
+    تابع خالص: ساخت کانتکست ساختاریافته چت از payload رکوردها (خروجی collect_payload).
+    فقط رکوردهای اسناد فعال لحاظ می‌شوند (اگر لیست اسناد فعال خالی باشد، همه رکوردها).
+    راهنماهای دامنه فقط از schema.chat_guidelines اسکیماهایی جمع می‌شوند که واقعاً در کانتکست حضور دارند.
+    اسکیماهای ناشناخته (مثلاً پس از Hot Reload) نادیده گرفته می‌شوند.
+    """
+    active = {str(a).strip() for a in (active_documents or [])}
+    blocks: List[str] = []
+    guidelines: List[str] = []
+
+    for mid, schemas in (payload or {}).items():
+        for sname, sdata in (schemas or {}).items():
+            recs = (sdata or {}).get("records") or []
+            if active:
+                recs = [r for r in recs if isinstance(r, dict) and _is_active_document(r.get("source_document"), active)]
+            if not recs:
+                continue
+            try:
+                schema = resolve_schema(sname, mid)
+            except ValueError:
+                continue
+            block = build_document_structured_context(schema, recs)
+            if not block:
+                continue
+            blocks.append(block)
+            for g in schema.chat_guidelines:
+                if g not in guidelines:
+                    guidelines.append(g)
+
+    return ChatStructuredContext("\n\n".join(blocks), tuple(guidelines))
+
+
 def build_rag_prompt(
     query: str,
     retrieved_chunks: List[Dict[str, Any]],
-    structured_context: str = ""
+    structured_context: str = "",
+    domain_guidelines: Optional[Iterable[str]] = None
 ) -> str:
     """
     ساخت پرامپت مهندسی‌شده RAG با تفکیک دقیق دستورالعمل، زمینه سند، و سوال کاربر.
     شامل قانون اکید عدم حدس زدن، شفافیت منشأ داده‌ها (Provenance) و پشتیبانی از متادیتای ساختاریافته.
+    متن‌های اختصاصی دامنه فقط از طریق domain_guidelines (schemas/*.json → chat.guidelines) وارد می‌شوند.
     """
     context_parts = []
     if structured_context and structured_context.strip():
@@ -134,6 +186,12 @@ def build_rag_prompt(
 
     context_str = "\n\n".join(context_parts)
 
+    guideline_lines = [f"- {g.strip()}" for g in (domain_guidelines or []) if g and g.strip()]
+    domain_section = (
+        "\nLINEE GUIDA SPECIFICHE DEL DOMINIO:\n" + "\n".join(guideline_lines) + "\n"
+        if guideline_lines else ""
+    )
+
     prompt = f"""You are a helpful and precise AI Document Assistant.
 Your task is to answer the user's question STRICTLY based on the provided document context below.
 
@@ -145,10 +203,10 @@ CRITICAL INSTRUCTIONS:
 4. Mention the relevant page number(s) if applicable when referencing facts.
 
 REGOLE DI TRASPARENZA SULLA PROVENIENZA DEI DATI:
-- Se l'informazione richiesta deriva da un campo contrassegnato con '(Stato: CALCULATED)', specifica esplicitamente all'utente che il dato (es. data di scadenza, validità o calcolo) NON è stampato testualmente sul documento, ma è stato calcolato deterministicamente dal sistema applicando le normative di settore vigenti e la periodicità prevista per la tipologia di corso/atto.
+- Se l'informazione richiesta deriva da un campo contrassegnato con '(Stato: CALCULATED)', specifica esplicitamente all'utente che il dato (es. data di scadenza, validità o calcolo) NON è stampato testualmente sul documento, ma è stato calcolato deterministicamente dal sistema applicando le normative di settore vigenti e le regole configurate per la tipologia di documento.
 - Se l'informazione è contrassegnata con '(Stato: EXTRACTED)', indicala come dato testuale presente nel documento.
-- Se un corso risulta senza scadenza (es. formazione generale con credito permanente), chiarisci che per legge la formazione non è soggetta ad aggiornamento periodico.
-
+- Se l'informazione è contrassegnata con '(Stato: EDITED)', indicala come dato verificato o corretto manualmente da un operatore.
+{domain_section}
 ---
 DOCUMENT CONTEXT:
 {context_str}

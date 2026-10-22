@@ -1,10 +1,10 @@
-# Project State Tracking — Modular Platform Architecture (v2.5)
-- **Architecture Phase:** Phase 1 (Advanced/Feature-Complete MVP — Streamlit + SQLite + Local ChromaDB)
+# Project State Tracking — Modular Platform Architecture (v2.6)
+- **Architecture Phase:** Phase 1 of 3 (Advanced/Feature-Complete MVP — Streamlit + SQLite + Local ChromaDB), ~95% complete — see *Strategic Architecture Roadmap* below.
 ## Current Status
-- **Current Milestone:** Step 8 Completed (Deterministic Auto-Routing, Batch Pipeline & Universal 4-Sheet Executive Report) 🟢
+- **Current Milestone:** Step 8.5 Completed (Architectural Hardening & Governance, Derived Dates, Chat Structured Context) 🟢
 - **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 38/38 Automated Pytest Test Suites Passing (100% Green).
+- **Test Suite Status:** 41/41 Automated Pytest Tests Passing (100% Green) — verified via `python check_health.py`.
 
 ---
 
@@ -28,7 +28,7 @@
 ### Step 3 — Scoped Exporters (Cross-Module Isolation)
 - تفکیک قطعی ماژول‌ها در خروجی‌های رسمی اکسل و ورد از طریق `app/reporting/common.py` (`resolve_scope`).
 - تضمین عدم نفوذ داده‌ها و شیت‌های ماژول‌های دیگر در گزارش نهایی (رفع آلودگی بین‌اسکیمایی).
-- اعتبارسنجی ۱۰۰٪ موفق با تست اختصاصی `test_scoped_reports.py`.
+- اعتبارسنجی ۱۰۰٪ موفق با تست اختصاصی `tests/test_reports.py::test_scoped_reporting_isolation`.
 
 ### Step 4 — Deadline Alerts Engine & Monitoring
 - راه‌اندازی موتور قطعی استخراج سررسیدهای قانونی و ممیزی (`app/alerts/deadlines.py`) با شناسه‌های یکتای UUID5.
@@ -86,17 +86,38 @@
 - **ارتقای اسکیمای مجوزهای زیست‌محیطی (`regulatory_authorization`) و موتورهای گزارش‌گیری (`layout.sheet_title` & `layout.word_sections`):** افزودن فیلدهای ظرفیت (`quantitativi_movimentabili`, `quantitativi_deposito`) بلافاصله بعد از کدهای EER، تفکیک شروط به دو فیلد `prescrizioni_con_scadenza` و `prescrizioni_tecnico_gestionali`، قانون تجمیع کل صفحات سند در یک رکورد واحد (Consolidated Record)، پشتیبانی از `sheet_title` سفارشی (`Dettagli File`) در اکسل و بخش‌های پویای جدول ۴ ستونی (`||`) و لیست شماره‌دار در Word (`app/reporting/word_exporter.py`) به همراه دکمه دانلود مستقیم Word در کنار اکسل در صفحه اول. مجموع تست‌ها: ۲۵/۲۵ سبز (۱۰۰٪ پاس).
 - **موتور محاسبه قطعی تاریخ انقضای دوره‌های آموزشی (Deterministic Derived Dates for Training Certifications):** پیاده‌سازی لایه محاسبات انقضا (`app/extraction/calculators.py` و `normalizer.py`) با پشتیبانی از سال‌های کبیسه (`relativedelta`)، تطبیق انعطاف‌پذیر کلمات کلیدی، اعتبارسنجی Fail-fast اسکیما (`derived_dates`) در `app/extraction/registry.py`، و اتصال خودکار فیلدهای `CALCULATED` به موتور هشدارهای تقویمی سررسیدها (`app/alerts/deadlines.py`) مطابق الزامات توافقنامه ایالت-مناطق ایتالیا (Accordo Stato-Regioni) و استانداردهای دوره‌های سرپرستی (۲۴ ماه)، مدیریتی (۶۰ ماه)، تجهیزات/لیفتراک (۶۰ ماه)، آتش‌نشانی (۶۰ ماه) و کمک‌های اولیه (۳۶ ماه) بر روی هر دو اسکیمای `personnel_training` (در ماژول `iso_14001`) و `training_certificate` (در ماژول `hr_training` با نام شیت سفارشی `Attestati Formazione`). مجموع تست‌ها: ۳۳/۳۳ سبز (۱۰۰٪ پاس).
 - **تزریق کانتکست ساختاریافته و قوانین شفافیت منشأ به چت با اسناد (Document Chat Structured Context & Provenance):** پیاده‌سازی `build_document_structured_context` در `app/ai/prompts.py` با پیمایش پویا بر روی `schema.fields` و `schema.computed`، تزریق خودکار اطلاعات رکوردهای استخراج‌شده/محاسبه‌شده اسناد فعال در تب `Document Chat` به `build_rag_prompt` قبل از تکه‌های متنی، و درج راهنمای شفافیت ممیزی داده‌ها (Provenance Guideline) جهت تفکیک دقیق داده‌های متن سند (`EXTRACTED`) از محاسبات قطعی بدون توهم سیستم (`CALCULATED`). مجموع تست‌ها: ۳۸/۳۸ سبز (۱۰۰٪ پاس).
+- **انتقال کانتکست چت از UI به لایه دامنه و حذف متن اختصاصی دامنه از پرامپت عمومی (Governance — Principle 2 & 3):** منطق جمع‌آوری و فیلتر رکوردهای اسناد فعال که داخل حلقه رندر `streamlit_app.py` نشت کرده بود به تابع خالص `build_chat_structured_context(payload, active_documents)` در `app/ai/prompts.py` منتقل شد (خروجی: `ChatStructuredContext(text, guidelines)`؛ اسکیماهای ناشناخته پس از Hot Reload نادیده گرفته می‌شوند). جمله اختصاصی آموزش («corso senza scadenza / formazione generale») از `build_rag_prompt` حذف و به کلید declarative جدید `chat.guidelines` در اسکیماهای `training_certificate` و `personnel_training` منتقل شد؛ رجیستری آن را اعتبارسنجی می‌کند (`SchemaDef.chat_guidelines`) و پرامپت آن را در بخش مجزای «LINEE GUIDA SPECIFICHE DEL DOMINIO» (جدا از DOCUMENT CONTEXT) فقط برای اسکیماهای حاضر در کانتکست درج می‌کند. افزودن قانون شفافیت برای وضعیت `EDITED`. مجموع تست‌ها: ۴۱/۴۱ سبز (۱۰۰٪ پاس).
 
 ---
 
-## Remaining Action Items & Next Milestones:
+## Strategic Architecture Roadmap (From MVP to Fully On-Prem):
 
-### Immediate Production Tuning:
-- تنظیم اعتبارنامه‌های واقعی ارسال ایمیل/پیامک (SMTP/Twilio) در فایل `.env`.
-- راه‌اندازی تسک خودکار زمان‌بندی‌شده روزانه (Cron Job / Windows Task Scheduler) برای اجرای خودکار `app/alerts/run.py`.
-- تیونینگ تدریجی کلمات کلیدی روتینگ در `schemas/*.json` با دریافت نمونه‌های بیشتر از اسناد شرکتی.
+### 🟢 PHASE 1: Feature-Complete Enterprise MVP (Current Status: ~95% Complete)
+- Stack: Streamlit UI + Google Gemini Flash/Vision + ChromaDB (Local Persistent) + SQLite (WAL mode).
+- [x] Framework-free pure Python multimodal RAG pipeline (PDF, Scanned Vision OCR, DOCX, XLSX smart header mapping, Images).
+- [x] Schema-driven registry (`schemas/*.json`) across 6 corporate compliance domains.
+- [x] Deterministic calculation engine (numeric `computed` + rule-based `derived_dates` with leap-year protection).
+- [x] Audit-proof scoped deliverables (Platform 4-Sheet Excel Exporter + Custom Word Staged Sections & Sign-offs).
+- [x] Compliance deadline monitoring & alert dispatcher with simulation guardrails (UUID5, Deduplication, SMTP/SMS).
+- [x] Structured context & provenance transparency rules in RAG document chat.
+- [ ] UI/UX Alignment: Modernize Streamlit frontend to match inambiente design system (Hero banner with sustainability theme, Card-based Sidebar Navigation pills with chevrons, and KPI metric cards).
+- [ ] Immediate production tuning (operational checklist):
+  - [ ] Configure real SMTP / Twilio SMS credentials in `.env` (`SMTP_*`, `TWILIO_*`) so alerts stop running in simulation mode.
+  - [ ] Schedule the daily alert scan (Windows Task Scheduler / cron) running `python -m app.alerts.run`.
+  - [ ] Incrementally tune routing keywords in `schemas/*.json` as more real company documents are collected.
 
-### Step 9 — Production Hardening & Multi-Tenant Authentication:
-- افزودن لایه احراز هویت سبک (Authentication) برای تفکیک امن نشست‌های کاربران سازمانی.
-- آماده‌سازی کانتینر Docker و پایپ‌لاین CI برای ارزیابی مداوم کیفیت.
-- [Phase 2 Architecture Task] ارتقای استخراج شروط دارای مهلت (prescrizioni_con_scadenza) از حالت تک‌رشته متنی به ساختار اسکیمای فرزند (Child Schema) با رکوردهای مجزا و فیلد تاریخ‌دار رسمی برای اتصال مستقیم به موتور هشدارهای تقویمی deadlines (نیازمند پشتیبانی چنداسکیمایی در build_routing_plan).
+### 🟡 PHASE 2: Scale & Internal Legal Knowledge Base (3–9 Months)
+- **Decoupled Async Architecture:** FastAPI backend with Celery/Redis for non-blocking batch extraction and background processing.
+- **Enterprise Storage & Schemas:** PostgreSQL migration with strict Pydantic payload models and hierarchical child schemas for line-item conditions (`prescrizioni_con_scadenza`).
+- **Hybrid Retrieval Engine:** Combine BM25 keyword matching with dense vector retrieval (Hybrid Search) for high-precision retrieval of legal articles and EER codes.
+- **Internal Compliance & Regulatory Database:** Dedicated repository storing company authorizations, past audits, and statutory texts (D.Lgs. 81/08, D.Lgs. 152/06, DM 02/09/2021) as local ground-truth for all extractions and calculations.
+- **Access Control & Telemetry:** Role-Based Access Control (RSGA / Technical Director / Auditor), SSO/LDAP integration, Prometheus metrics, and automated daily expiry daemon digests.
+
+### 🔵 PHASE 3: Sovereign — Fully On-Premises GPU Architecture (12 Months)
+- **Zero Document Egress (Data Sovereignty):** 100% offline, on-premises deployment with 0 external tokens escaping the enterprise perimeter.
+- **Target Hardware & Serving Stack:** Single 24 GB VRAM GPU (RTX 4090 / RTX A5000), served via vLLM or Ollama.
+- **Local Model Suite:**
+  - LLM: Qwen 2.5 14B (4-bit quantized) for extraction and reasoning.
+  - Vision / OCR: Qwen2-VL for high-fidelity scanned document transcription.
+  - Embeddings: BGE-M3 local dense/sparse multilingual vector embeddings.
+- **Drop-in Cut-Over:** Preserves exact same chunking strategy, JSON schemas, review grid, and exporters; swaps only the AI adapter layer with health-check fallback.

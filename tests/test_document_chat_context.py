@@ -1,7 +1,12 @@
 import pytest
 from app.extraction.registry import resolve_schema, reload_registry
 from app.extraction.extractor import finalize_record
-from app.ai.prompts import build_document_structured_context, build_rag_prompt
+from app.ai.prompts import (
+    ChatStructuredContext,
+    build_chat_structured_context,
+    build_document_structured_context,
+    build_rag_prompt,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -177,12 +182,81 @@ def test_build_rag_prompt_with_structured_context_and_provenance_rules():
     assert "(Stato: CALCULATED)" in prompt
     assert "calcolato deterministicamente dal sistema applicando le normative di settore vigenti" in prompt
     assert "(Stato: EXTRACTED)" in prompt
-    assert "Se un corso risulta senza scadenza" in prompt
-    assert "non è soggetta ad aggiornamento periodico" in prompt
 
-    # 4. Backward compatibility without structured_context
+    # 4. Generic prompt carries no domain-specific wording
+    assert "LINEE GUIDA SPECIFICHE DEL DOMINIO:" not in prompt
+    assert "Se un corso risulta senza scadenza" not in prompt
+
+    # 5. Domain guidelines come from the schema (chat.guidelines) and sit before DOCUMENT CONTEXT
+    guided = build_rag_prompt("Qual è la data di scadenza del corso?", chunks,
+                              structured_context=struct_ctx, domain_guidelines=schema.chat_guidelines)
+    assert "LINEE GUIDA SPECIFICHE DEL DOMINIO:" in guided
+    assert "Se un corso risulta senza scadenza" in guided
+    assert "non è soggetta ad aggiornamento periodico" in guided
+    assert guided.find("LINEE GUIDA SPECIFICHE DEL DOMINIO:") < guided.find("DOCUMENT CONTEXT:")
+
+    # 6. Backward compatibility without structured_context
     simple_prompt = build_rag_prompt("Qual è il nome?", chunks)
     assert "REGOLE DI TRASPARENZA SULLA PROVENIENZA DEI DATI:" in simple_prompt
     assert "Si attesta che Mario Rossi ha superato la prova finale del corso." in simple_prompt
+
+
+def _rec(doc, name, page=1):
+    return {
+        "source_document": doc,
+        "source_page": page,
+        "fields": {"nominativo_dipendente": {"normalized_value": name, "status": "EXTRACTED"}},
+    }
+
+
+@pytest.mark.offline
+def test_build_chat_structured_context_filters_active_documents_and_collects_guidelines():
+    payload = {
+        "hr_training": {"training_certificate": {"records": [
+            _rec("attestato_a.pdf", "Anna Bianchi"),
+            _rec("C:/uploads/attestato_b.pdf", "Bruno Verdi"),   # basename match
+            _rec("rimosso.pdf", "Carlo Neri"),                   # not active
+        ]}},
+        "iso_14001": {"personnel_training": {"records": [
+            _rec("attestato_a.pdf", "Anna Bianchi"),
+        ]}},
+    }
+    ctx = build_chat_structured_context(payload, ["attestato_a.pdf", "attestato_b.pdf"])
+
+    assert isinstance(ctx, ChatStructuredContext)
+    assert "Anna Bianchi" in ctx.text
+    assert "Bruno Verdi" in ctx.text
+    assert "Carlo Neri" not in ctx.text
+    assert ctx.text.count("--- DATI ESTRATTI E METADATI DEL DOCUMENTO ---") == 2
+    # Same guideline declared by both schemas is deduplicated
+    assert len(ctx.guidelines) == 1
+    assert "Se un corso risulta senza scadenza" in ctx.guidelines[0]
+
+
+@pytest.mark.offline
+def test_build_chat_structured_context_edge_cases():
+    # Empty / missing payload
+    assert build_chat_structured_context(None) == ChatStructuredContext()
+    assert build_chat_structured_context({}, ["x.pdf"]) == ChatStructuredContext()
+
+    # No active documents -> all records are used
+    payload = {"hr_training": {"training_certificate": {"records": [_rec("x.pdf", "Dario Gialli")]}}}
+    assert "Dario Gialli" in build_chat_structured_context(payload, []).text
+
+    # Active filter excludes everything -> empty context and no guidelines
+    assert build_chat_structured_context(payload, ["altro.pdf"]) == ChatStructuredContext()
+
+    # Schema without chat.guidelines contributes data but no guidelines
+    energy = {"energy_utility": {"energy_bill": {"records": [{
+        "source_document": "bolletta.pdf", "source_page": 1,
+        "fields": {"fornitore": {"normalized_value": "eVISO", "status": "EXTRACTED"}},
+    }]}}}
+    ctx = build_chat_structured_context(energy, ["bolletta.pdf"])
+    assert "eVISO" in ctx.text
+    assert ctx.guidelines == ()
+
+    # Unknown module/schema (e.g. removed after hot reload) is skipped, not raised
+    ghost = {"ghost_module": {"ghost_schema": {"records": [_rec("x.pdf", "Ezio")]}}}
+    assert build_chat_structured_context(ghost, ["x.pdf"]) == ChatStructuredContext()
 
 

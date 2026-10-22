@@ -78,6 +78,11 @@
           "strong_keywords": ["attest*", "corso di formazione", "81/08", "ente formatore"],
           "keywords": ["aggiornament*", "rspp", "antincendio", "primo soccorso", "carrellist*", "lavorator*", "ore di formazione", "rlsr", "abilitazion*"]
         },
+      "chat": {
+        "guidelines": [
+          "Se un corso risulta senza scadenza (es. formazione generale con credito permanente), chiarisci che per legge la formazione non è soggetta ad aggiornamento periodico."
+        ]
+      },
       "derived_dates": {
         "data_scadenza_rinnovo": {
           "base_field": "data_emissione",

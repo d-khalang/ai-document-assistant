@@ -30,7 +30,7 @@ This document defines the non-negotiable architectural invariants, development w
 
 ### 🔴 Principle 3: Declarative, Schema-Driven Extensibility
 - Domain logic and schemas live exclusively in `schemas/*.json` (`energy_utility`, `hr_training`, `machinery_maintenance`, `iso_14001`, `general_documents`, `fleet_fuel_expenses`).
-- Routing rules, keyword scoring (`strong_keywords`, `keywords`), field types, computed operators, and alert thresholds **must be declared in JSON**.
+- Routing rules, keyword scoring (`strong_keywords`, `keywords`), field types, computed operators, derived dates (`derived_dates`), report layouts (`layout`), alert thresholds, and domain-specific chat wording (`chat.guidelines`) **must be declared in JSON**.
 - **NEVER** hardcode schema names, field names, or classification keywords in Python code.
 
 ### 🔴 Principle 4: Concurrency & Database Safety
@@ -43,7 +43,7 @@ This document defines the non-negotiable architectural invariants, development w
 - Document removal must evict records and deactivate deadlines (`deactivate_deadlines_for_document`, `deactivate_missing_deadlines`).
 
 ### 🔴 Principle 6: Test-Driven Stability & Zero Regressions
-- The entire offline test suite (`pytest -q -p no:cacheprovider`) must remain 100% green (18/18 tests passing) before concluding any task.
+- The entire offline test suite (`pytest -q -p no:cacheprovider`) must remain 100% green before concluding any task (v2.6 baseline: 41/41 tests passing). The authoritative gate is `python check_health.py` (exit code 0); never lower the count by deleting or skipping tests.
 - Any new architectural feature or bug fix must be accompanied by offline unit/integration tests in `tests/`.
 
 ---

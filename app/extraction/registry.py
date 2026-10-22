@@ -67,6 +67,7 @@ class SchemaDef:
     routing: Dict[str, Any] = field(default_factory=dict)
     layout: Dict[str, Any] = field(default_factory=dict)
     derived: Dict[str, DerivedDateDef] = field(default_factory=dict)
+    chat_guidelines: List[str] = field(default_factory=list)
 
     @property
     def sheet_title(self) -> Optional[str]:
@@ -168,6 +169,10 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         if sec.get("field") not in fields or sec.get("style") not in ("table", "list"):
             raise ValueError(f"{src}: {name}.layout.word_sections invalid: {sec}")
 
+    guidelines = (raw.get("chat") or {}).get("guidelines") or []
+    if not isinstance(guidelines, list) or not all(isinstance(g, str) and g.strip() for g in guidelines):
+        raise ValueError(f"{src}: {name}.chat.guidelines must be a list of non-empty strings")
+
     raw_derived = raw.get("derived_dates") or {}
     derived: Dict[str, DerivedDateDef] = {}
     for target_name, dconf in raw_derived.items():
@@ -223,7 +228,8 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         computed,
         routing,
         layout=layout,
-        derived=derived
+        derived=derived,
+        chat_guidelines=[g.strip() for g in guidelines]
     )
 
 @lru_cache(maxsize=1)
