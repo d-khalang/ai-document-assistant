@@ -4,7 +4,7 @@
 - **Current Milestone:** Step 8 Completed (Deterministic Auto-Routing, Batch Pipeline & Universal 4-Sheet Executive Report) 🟢
 - **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 33/33 Automated Pytest Test Suites Passing (100% Green).
+- **Test Suite Status:** 38/38 Automated Pytest Test Suites Passing (100% Green).
 
 ---
 
@@ -85,6 +85,7 @@
 - **مدرن‌سازی بصری و ارگونومی ناوبری سایدبار (`app/ui/theme.py`):** بازطراحی کامل استایل‌های `st.radio` در سایدبار به سبک Pill Tabs مدرن؛ فونت درشت‌تر (`1.15rem`، وزن ۶۰۰ تا ۷۵۰)، حذف دایره‌های رادیویی پیش‌فرض، موشن و شیفت افقی نرم هنگام Hover (`translateX(6px)` با سایه و پس‌زمینه ارگانیک `#EEF7E3`)، بردر و پس‌زمینه سبز شاخص برای تب فعال (`#E2F1D2` / `#8CC63F`) به همراه خط نشانگر عمودی (Accent line) و تست بدون خطای جابه‌جایی بین تمامی صفحات ۵‌گانه.
 - **ارتقای اسکیمای مجوزهای زیست‌محیطی (`regulatory_authorization`) و موتورهای گزارش‌گیری (`layout.sheet_title` & `layout.word_sections`):** افزودن فیلدهای ظرفیت (`quantitativi_movimentabili`, `quantitativi_deposito`) بلافاصله بعد از کدهای EER، تفکیک شروط به دو فیلد `prescrizioni_con_scadenza` و `prescrizioni_tecnico_gestionali`، قانون تجمیع کل صفحات سند در یک رکورد واحد (Consolidated Record)، پشتیبانی از `sheet_title` سفارشی (`Dettagli File`) در اکسل و بخش‌های پویای جدول ۴ ستونی (`||`) و لیست شماره‌دار در Word (`app/reporting/word_exporter.py`) به همراه دکمه دانلود مستقیم Word در کنار اکسل در صفحه اول. مجموع تست‌ها: ۲۵/۲۵ سبز (۱۰۰٪ پاس).
 - **موتور محاسبه قطعی تاریخ انقضای دوره‌های آموزشی (Deterministic Derived Dates for Training Certifications):** پیاده‌سازی لایه محاسبات انقضا (`app/extraction/calculators.py` و `normalizer.py`) با پشتیبانی از سال‌های کبیسه (`relativedelta`)، تطبیق انعطاف‌پذیر کلمات کلیدی، اعتبارسنجی Fail-fast اسکیما (`derived_dates`) در `app/extraction/registry.py`، و اتصال خودکار فیلدهای `CALCULATED` به موتور هشدارهای تقویمی سررسیدها (`app/alerts/deadlines.py`) مطابق الزامات توافقنامه ایالت-مناطق ایتالیا (Accordo Stato-Regioni) و استانداردهای دوره‌های سرپرستی (۲۴ ماه)، مدیریتی (۶۰ ماه)، تجهیزات/لیفتراک (۶۰ ماه)، آتش‌نشانی (۶۰ ماه) و کمک‌های اولیه (۳۶ ماه) بر روی هر دو اسکیمای `personnel_training` (در ماژول `iso_14001`) و `training_certificate` (در ماژول `hr_training` با نام شیت سفارشی `Attestati Formazione`). مجموع تست‌ها: ۳۳/۳۳ سبز (۱۰۰٪ پاس).
+- **تزریق کانتکست ساختاریافته و قوانین شفافیت منشأ به چت با اسناد (Document Chat Structured Context & Provenance):** پیاده‌سازی `build_document_structured_context` در `app/ai/prompts.py` با پیمایش پویا بر روی `schema.fields` و `schema.computed`، تزریق خودکار اطلاعات رکوردهای استخراج‌شده/محاسبه‌شده اسناد فعال در تب `Document Chat` به `build_rag_prompt` قبل از تکه‌های متنی، و درج راهنمای شفافیت ممیزی داده‌ها (Provenance Guideline) جهت تفکیک دقیق داده‌های متن سند (`EXTRACTED`) از محاسبات قطعی بدون توهم سیستم (`CALCULATED`). مجموع تست‌ها: ۳۸/۳۸ سبز (۱۰۰٪ پاس).
 
 ---
 

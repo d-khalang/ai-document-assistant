@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -50,7 +51,7 @@ from app.alerts.notifiers import SmtpEmailNotifier, TwilioSmsNotifier
 from app.reporting.platform_excel_exporter import create_platform_excel_report
 
 from app.ai.gemini import generate_answer
-from app.ai.prompts import build_rag_prompt
+from app.ai.prompts import build_rag_prompt, build_document_structured_context
 from app.rag.loader import load_document_content
 from app.rag.chunker import split_text_into_chunks
 from app.rag.embeddings import get_batch_embeddings
@@ -61,7 +62,7 @@ from app.rag.vectorstore import (
 )
 from app.rag.retriever import retrieve_relevant_chunks
 
-from app.extraction.registry import list_modules, get_module, reload_registry
+from app.extraction.registry import list_modules, get_module, resolve_schema, reload_registry
 from app.extraction.extractor import extract_for_documents
 from app.extraction.review import records_to_dataframe, dataframe_to_records
 
@@ -547,8 +548,36 @@ def render_ui():
             else:
                 with loader("Ricerca nei documenti", "Recupero semantico e generazione della risposta…", "orbit"):
                     try:
+                        structured_blocks = []
+                        payload = collect_payload(st.session_state.get("extracted_data", {}), st.session_state.get("reviewed_data", {}))
+                        active_docs = set(ss.indexed_documents) if ss.indexed_documents else set()
+
+                        for mid, schemas in (payload or {}).items():
+                            for sname, sdata in (schemas or {}).items():
+                                recs = sdata.get("records") or []
+                                if active_docs:
+                                    matching_recs = [
+                                        r for r in recs
+                                        if any(
+                                            str(r.get("source_document") or "").strip() == a
+                                            or os.path.basename(str(r.get("source_document") or "").strip()) == os.path.basename(a)
+                                            for a in active_docs
+                                        )
+                                    ]
+                                else:
+                                    matching_recs = recs
+
+                                if matching_recs:
+                                    schema_obj = resolve_schema(sname, mid)
+                                    if schema_obj:
+                                        block = build_document_structured_context(schema_obj, matching_recs)
+                                        if block:
+                                            structured_blocks.append(block)
+
+                        structured_context = "\n\n".join(structured_blocks)
+
                         chunks = retrieve_relevant_chunks(query=query, collection_name="document_chunks", top_k=RAG_TOP_K, document_names=list(ss.indexed_documents))
-                        answer = generate_answer(build_rag_prompt(query, chunks))
+                        answer = generate_answer(build_rag_prompt(query, chunks, structured_context=structured_context))
                         save_message(ss.conversation_id, "user", query)
                         save_message(ss.conversation_id, "assistant", answer)
                         st.rerun()
