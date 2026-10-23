@@ -377,6 +377,7 @@ hr { border-color:var(--border)!important; }
  font-weight:700;
  color:#213C24;
 }
+.page-hero .pill-icon { flex:0 0 17px; width:17px; height:17px; color:#4F7F1E; }
 .page-hero .module-pill {
  background:rgba(238,247,227,.75);
  color:#274B16;
@@ -754,6 +755,11 @@ _TENANT_PATHS = (
 )
 
 
+_BUILDING_ICON = (
+    "<svg class='pill-icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' "
+    "stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" + _TENANT_PATHS + "</svg>"
+)
+
 _LEAF_ICON = (
     "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' "
     "stroke-linejoin='round' aria-hidden='true'><path d='M5 19c0-8 5-13 14-14 0 9-5 14-13 14'/><path d='M5 19c3-5 6-8 10-10'/></svg>"
@@ -852,7 +858,7 @@ def render_page_header(
                 <div class='headline'>{safe_title}</div>
                 {subtitle_html}
                 <div class='subline'>
-                    <span class='tenant-pill'>🏢 {safe_tenant}</span>
+                    <span class='tenant-pill'>{_BUILDING_ICON}{safe_tenant}</span>
                     {module_pill_html}
                     {version_badge_html}
                 </div>

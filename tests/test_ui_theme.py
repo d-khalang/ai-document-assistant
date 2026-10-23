@@ -75,6 +75,7 @@ def test_page_header_with_dynamic_metadata_and_module_pill(captured):
     assert "Sistemi Ambientali ISO 14001" in out
     assert "v1.0.0" in out
     assert "module-pill" in out
+    assert "🏢" not in out and "class='pill-icon'" in out   # tenant pill uses the SVG building, not an emoji
 
 
 @pytest.mark.offline
