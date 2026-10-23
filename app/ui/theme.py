@@ -4,8 +4,10 @@ from __future__ import annotations
 import base64
 import html
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
+from urllib.parse import quote
 
 import streamlit as st
 
@@ -33,7 +35,7 @@ html, body, [class*="css"], .stApp, .stMarkdown, label, input, textarea, button,
 }
 .stApp { background:var(--canvas); color:var(--text); font-size:16px; }
 [data-testid="stHeader"] { background:rgba(246,248,245,.88); }
-.block-container { max-width:1500px; padding-top:1.8rem; padding-bottom:4rem; }
+.block-container { max-width:1500px; padding-top:4.6rem; padding-bottom:4rem; }
 .stMarkdown p,.stMarkdown li { font-size:1rem; line-height:1.7; color:var(--text); }
 h1,h2,h3,h4 { color:#1F3424; letter-spacing:-.025em; }
 h1 { font-size:2.15rem !important; font-weight:800 !important; }
@@ -42,79 +44,132 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color:var(--muted)!important; font-size:.9rem!important; line-height:1.55; }
 [data-testid="stSidebar"] { background:#FFFFFF; border-right:1px solid var(--border); }
 [data-testid="stSidebar"] > div:first-child { padding-top:1.2rem; }
-/* Modern Pill Navigation for Sidebar Radio */
+/* Sidebar navigation cards: white card, soft border, chevron at the end of the row */
 [data-testid="stSidebar"] [data-testid="stRadio"] { width:100%; }
-[data-testid="stSidebar"] [data-testid="stRadio"] > div { gap:.4rem; }
-[data-testid="stSidebar"] [data-testid="stRadio"] label {
+[data-testid="stSidebar"] [data-testid="stRadio"] > div { gap:.55rem; }
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] { display:flex; flex-direction:column; align-items:stretch; gap:.55rem; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) {
  position:relative;
  display:flex;
  align-items:center;
+ gap:.4rem;
  width:100%;
- padding:.85rem 1.15rem;
- margin-bottom:.45rem;
+ padding:.85rem 1rem .85rem 1.15rem;
+ margin-bottom:0;
  border-radius:14px;
- border:1.5px solid transparent;
- background:transparent;
+ border:1.5px solid var(--border);
+ background:#FFFFFF;
+ box-shadow:0 2px 8px rgba(34,62,37,.04);
  cursor:pointer;
  overflow:hidden;
- transition:all .25s cubic-bezier(0.4, 0, 0.2, 1);
+ transition:background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label p,
-[data-testid="stSidebar"] [data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] p,
-[data-testid="stSidebar"] [data-testid="stRadio"] label span {
- font-size:1.15rem !important;
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) p,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span {
+ font-size:1.05rem !important;
  font-weight:600;
  color:#2D3D30;
  line-height:1.35;
  letter-spacing:-.01em;
- transition:color .2s ease, font-weight .2s ease;
 }
-/* Hide the small default circular radio indicator for a clean pill-tab look */
-[data-testid="stSidebar"] [data-testid="stRadio"] label > div > div:first-child:not(:only-child),
-[data-testid="stSidebar"] [data-testid="stRadio"] label div[class*="e1mpz0hj4"] {
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[data-testid="stMarkdownContainer"] p {
+ display:flex;
+ align-items:center;
+ gap:.6rem;
+ margin:0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span[data-testid="stIconMaterial"],
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span.material-symbols-rounded,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span.material-symbols-sharp {
+ font-size:1.3rem !important;
+ width:1.3rem;
+ height:1.3rem;
+ line-height:1;
+ color:#4F7F1E;
+ flex-shrink:0;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"] span[data-testid="stIconMaterial"],
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked) span[data-testid="stIconMaterial"],
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"] span[data-testid="stIconMaterial"] {
+ color:#2E6212;
+}
+/* Hide the default circular radio indicator */
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) > div > div:first-child:not(:only-child),
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[class*="e1mpz0hj4"] {
  display:none !important;
 }
-/* Hover State with soft organic green and smooth horizontal slide */
-[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
- background:#EEF7E3;
- border-color:#D3E5C5;
- transform:translateX(6px);
- box-shadow:0 4px 16px rgba(140,198,63,.16);
+/* Chevron ">" pinned to the end of every row */
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])::after {
+ content:"";
+ flex:0 0 18px;
+ width:18px;
+ height:18px;
+ margin-left:auto;
+ background:url("__CHEVRON__") center / contain no-repeat;
+ transition:transform .2s ease;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label:hover p {
- color:#1A381E !important;
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):hover {
+ background:#F7FBF2;
+ border-color:#C9DEB8;
+ box-shadow:0 4px 14px rgba(140,198,63,.14);
 }
-/* Active / Checked State */
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-selected="true"],
-[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked),
-[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] {
- background:#E2F1D2 !important;
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):hover::after { transform:translateX(3px); }
+/* Active / checked card */
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"],
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked),
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"] {
+ background:#EEF7E3 !important;
  border-color:#8CC63F !important;
- box-shadow:0 4px 18px rgba(140,198,63,.22), 0 1px 3px rgba(0,0,0,.03) !important;
+ box-shadow:0 4px 16px rgba(140,198,63,.20) !important;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-selected="true"] p,
-[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p,
-[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"] p {
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"] p,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked) p,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"] p {
  color:#1E3B1C !important;
- font-weight:750 !important;
+ font-weight:800 !important;
 }
-/* Distinct brand accent line on the left edge of the active navigation pill */
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-selected="true"]::before,
-[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked)::before,
-[data-testid="stSidebar"] [data-testid="stRadio"] label[aria-checked="true"]::before {
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"]::after,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked)::after,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"]::after {
+ background-image:url("__CHEVRON_ACTIVE__");
+}
+/* Brand-green indicator bar on the left edge of the active card */
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"]::before,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked)::before,
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"]::before {
  content:"";
  position:absolute;
  left:0;
- top:15%;
- bottom:15%;
+ top:14%;
+ bottom:14%;
  width:5px;
  border-radius:0 4px 4px 0;
- background:linear-gradient(180deg, #8CC63F 0%, #4F7F1E 100%);
+ background:#8CC63F;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] label[data-selected="true"]:hover,
-[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked):hover {
- transform:translateX(4px);
+/* Operating-module selector uses the same card look (BaseWeb select and the newer role=group select) */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="group"] {
+ min-height:3.1rem;
+ padding:.15rem .5rem .15rem .35rem;
+ border:1.5px solid #CFDDC6 !important;
+ border-radius:14px !important;
+ background:#FFFFFF !important;
+ box-shadow:0 2px 8px rgba(34,62,37,.04);
+ transition:border-color .2s ease, background .2s ease, box-shadow .2s ease;
 }
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div:hover,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="group"]:hover,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="group"]:focus-within {
+ border-color:#8CC63F !important;
+ background:#F7FBF2 !important;
+ box-shadow:0 4px 14px rgba(140,198,63,.16);
+}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] div[value],
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] span,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="group"] { font-weight:650; color:#2D3D30; }
+[data-testid="stSidebar"] [data-testid="stSelectbox"] svg { color:#4F7F1E; }
 [data-testid="stVerticalBlockBorderWrapper"] { border:1px solid var(--border)!important; border-radius:var(--radius)!important; background:var(--surface); box-shadow:0 2px 12px rgba(20,50,20,.025); }
 [data-testid="stMetric"] { padding:1rem 1.1rem; border:1px solid var(--border); border-radius:14px; background:white; box-shadow:0 3px 14px rgba(20,50,20,.035); }
 [data-testid="stMetricLabel"] { color:var(--muted)!important; font-size:.9rem!important; }
@@ -123,7 +178,6 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
 .stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"] { background:var(--brand); color:#1E3018; border-color:var(--brand); }
 .stButton > button:hover, .stDownloadButton > button:hover { border-color:var(--brand-dark); transform:translateY(-1px); box-shadow:0 7px 18px rgba(61,100,35,.12); }
 [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea, [data-baseweb="select"] > div { border-radius:10px!important; border-color:#D5DED3!important; background:#fff!important; min-height:2.7rem; }
-[data-testid="stFileUploader"] { border:1.5px dashed #B7CBAE; border-radius:16px; padding:1rem; background:#FBFDF9; }
 [data-testid="stDataFrame"], [data-testid="stTable"] { border:1px solid var(--border); border-radius:12px; overflow:hidden; }
 [data-testid="stExpander"] { border:1px solid var(--border); border-radius:12px; background:#fff; }
 [data-testid="stChatMessage"] { border:1px solid var(--border); border-radius:16px; padding:.8rem 1rem; background:#fff; margin-bottom:.7rem; }
@@ -171,21 +225,10 @@ hr { border-color:var(--border)!important; }
 .brand-card .brand-info { flex:1; min-width:0; }
 .brand-card .brand-name { font-size:1.12rem; font-weight:850; color:#244026; letter-spacing:-.02em; line-height:1.15; }
 .brand-card .brand-sub { font-size:.72rem; font-weight:700; color:#5D745B; letter-spacing:.06em; margin-top:.2rem; text-transform:uppercase; }
-.brand-card .brand-zoom-pill {
- font-size:.82rem;
- padding:4px 7px;
- border-radius:8px;
- background:rgba(140,198,63,.15);
- color:#4F7F1E;
- font-weight:700;
- transition:background .15s ease;
-}
-.brand-card:hover .brand-zoom-pill { background:var(--brand); color:#1A331E; }
 
 /* Whole-card click target: invisible button stretched over the card via Streamlit's .st-key-* classes */
 .st-key-brand_card_box { position:relative !important; gap:0 !important; margin-bottom:.85rem; cursor:pointer; }
 .st-key-brand_card_box:hover .brand-card { border-color:var(--brand); transform:translateY(-2px); box-shadow:0 8px 24px rgba(140,198,63,.25); }
-.st-key-brand_card_box:hover .brand-zoom-pill { background:var(--brand); color:#1A331E; }
 /* Card visuals never intercept the mouse: clicks fall through to the overlay button */
 .st-key-brand_card_box .brand-card,
 .st-key-brand_card_box .brand-card * { pointer-events:none !important; }
@@ -210,7 +253,7 @@ hr { border-color:var(--border)!important; }
  padding:0 !important;
 }
 
-/* Full-width modern executive header banner */
+/* Full-width executive header banner with vector sustainability artwork */
 .page-hero {
  position:relative;
  overflow:hidden;
@@ -219,9 +262,9 @@ hr { border-color:var(--border)!important; }
  border-radius:22px;
  padding:1.85rem 2.4rem;
  background:
-  radial-gradient(circle at 94% 25%, rgba(140,198,63,.22), transparent 42%),
-  radial-gradient(circle at 8% 110%, rgba(79,127,30,.08), transparent 36%),
-  linear-gradient(130deg,#FFFFFF 0%,#F8FAF6 45%,#EEF6E8 100%);
+  linear-gradient(90deg,#FFFFFF 0%,rgba(255,255,255,.92) 34%,rgba(255,255,255,0) 66%),
+  url("__HERO_ART__") right bottom / auto 100% no-repeat,
+  linear-gradient(130deg,#FFFFFF 0%,#F4F9EF 55%,#E6F2DB 100%);
  box-shadow:0 10px 32px rgba(45,80,40,.06), 0 2px 6px rgba(0,0,0,.02);
  margin-bottom:1.85rem;
  display:flex;
@@ -237,9 +280,8 @@ hr { border-color:var(--border)!important; }
  bottom:0;
  width:7px;
  background:linear-gradient(180deg,#8CC63F 0%,#4F7F1E 100%);
- border-radius:6px 0 0 6px;
 }
-.page-hero-content { flex:1; min-width:0; }
+.page-hero-content { position:relative; flex:1; min-width:0; }
 .page-hero .eyebrow {
  display:inline-flex;
  align-items:center;
@@ -267,27 +309,259 @@ hr { border-color:var(--border)!important; }
  display:flex;
  align-items:center;
  flex-wrap:wrap;
- gap:12px;
- color:#556658;
- margin-top:.6rem;
- font-size:.98rem;
+ gap:10px;
+ margin-top:.8rem;
+ font-size:.95rem;
 }
-.page-hero .tenant-pill {
+/* Frosted-glass status pills (tenant + version) */
+.page-hero .hero-subline-text {
+ color:#38543B;
+ font-size:1.02rem;
+ font-weight:550;
+ margin-top:.45rem;
+ line-height:1.45;
+}
+.page-hero .tenant-pill,
+.page-hero .module-pill,
+.page-hero .version-badge {
+ display:inline-flex;
+ align-items:center;
+ gap:6px;
+ padding:5px 14px;
+ border-radius:999px;
+ border:1px solid rgba(79,127,30,.28);
+ background:rgba(255,255,255,.62);
+ -webkit-backdrop-filter:blur(8px);
+ backdrop-filter:blur(8px);
+ box-shadow:0 2px 8px rgba(45,80,40,.06), inset 0 1px 0 rgba(255,255,255,.8);
  font-weight:700;
  color:#213C24;
 }
-.page-hero .version-badge {
- background:#FFFFFF;
- border:1px solid #CFDFCA;
- border-radius:8px;
- padding:2px 10px;
- font-size:.82rem;
- font-weight:700;
- color:#4F7F1E;
- box-shadow:0 1px 4px rgba(0,0,0,.03);
+.page-hero .module-pill {
+ background:rgba(238,247,227,.75);
+ color:#274B16;
+ border-color:rgba(140,198,63,.45);
+}
+.page-hero .version-badge { font-size:.84rem; color:#4F7F1E; }
+.page-hero-slogan {
+ position:relative;
+ align-self:flex-end;
+ flex:0 1 300px;
+ max-width:320px;
+ display:flex;
+ gap:.7rem;
+ align-items:flex-start;
+ padding:1rem 1.15rem;
+ border-radius:16px;
+ border:1px solid rgba(79,127,30,.22);
+ background:rgba(255,255,255,.52);
+ -webkit-backdrop-filter:blur(3px);
+ backdrop-filter:blur(3px);
+ box-shadow:0 6px 20px rgba(45,80,40,.08);
+ color:#1F4A1E;
+ font-size:1.12rem;
+ font-weight:750;
+ line-height:1.35;
+ letter-spacing:-.01em;
+ text-align:right;
+}
+.page-hero-slogan svg { flex:0 0 26px; width:26px; height:26px; color:#4F7F1E; }
+
+/* Dashboard metric cards */
+.metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1rem; margin:.4rem 0 1.5rem; }
+.metric-card {
+ display:flex;
+ gap:1rem;
+ align-items:flex-start;
+ padding:1.15rem 1.25rem;
+ background:#fff;
+ border:1.5px solid var(--border);
+ border-radius:18px;
+ box-shadow:0 4px 18px rgba(34,62,37,.05);
+}
+.metric-icon { display:grid; place-items:center; flex:0 0 48px; width:48px; height:48px; border-radius:14px; }
+.metric-icon svg { width:26px; height:26px; }
+.metric-body { min-width:0; }
+.metric-label { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:.92rem; font-weight:650; }
+.metric-info {
+ display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%;
+ border:1.5px solid #9AA89C; color:#7C897E; font-size:.64rem; font-weight:800; font-style:normal; cursor:help;
+}
+.metric-value { color:#1F3424; font-size:2.4rem; font-weight:850; line-height:1.1; letter-spacing:-.03em; margin-top:.25rem; }
+.metric-note { margin-top:.4rem; font-size:.85rem; font-weight:650; color:var(--muted); }
+.metric-card.tone-green .metric-icon { background:#EEF7E3; color:#4F7F1E; }
+.metric-card.tone-blue  .metric-icon { background:#E8F1FD; color:#1D5FB8; }
+.metric-card.tone-red   .metric-icon { background:#FDECEA; color:#B42318; }
+.metric-card.tone-green .metric-note.delta { color:#2E7D32; }
+.metric-card.tone-blue  .metric-note.delta { color:#1D5FB8; }
+.metric-card.tone-red   .metric-note.delta { color:#B42318; }
+
+/* File dropzone: soft dashed frame, single green action button on the right */
+[data-testid="stFileUploader"] { border:none; padding:0; background:transparent; }
+[data-testid="stFileUploaderDropzone"] {
+ border:1.5px dashed #A9C795;
+ border-radius:18px;
+ background:#FAFDF7;
+ padding:1.15rem 1.4rem;
+ align-items:center;
+ transition:border-color .2s ease, background .2s ease;
+}
+[data-testid="stFileUploaderDropzone"]:hover { border-color:#8CC63F; background:#F3FAEA; }
+[data-testid="stFileUploaderDropzone"] > span:has(button), [data-testid="stFileUploaderDropzone"] > div:has(button) { order:2; margin-left:auto; }
+[data-testid="stFileUploaderDropzoneInstructions"] { order:1; }
+[data-testid="stFileUploaderDropzoneInstructions"] span::before { content:"Trascina qui i file oppure selezionali dal computer"; display:block; color:#2D3D30; font-size:1rem; font-weight:650; margin-bottom:.15rem; }
+
+/* Hide any duplicate/inline button inside instructions or duplicate container siblings */
+[data-testid="stFileUploaderDropzoneInstructions"] button,
+[data-testid="stFileUploaderDropzone"] > span:has(button) ~ span:has(button),
+[data-testid="stFileUploaderDropzone"] > div:has(button) ~ div:has(button),
+[data-testid="stFileUploaderDropzone"] > span:has(button) ~ div:has(button),
+[data-testid="stFileUploaderDropzone"] > div:has(button) ~ span:has(button),
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:nth-of-type(n+2) {
+ display:none !important;
 }
 
+/* Style only the single primary Browse/Upload action button */
+[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button,
+[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button,
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type {
+ background:#8CC63F !important;
+ border:1px solid #8CC63F !important;
+ border-radius:11px !important;
+ min-height:2.75rem;
+ min-width:9rem;
+ padding:0 1.5rem !important;
+ box-shadow:0 4px 12px rgba(140,198,63,.30);
+ transition:background .16s ease, transform .16s ease;
+}
+[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button:hover,
+[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button:hover,
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type:hover {
+ background:#7DB531 !important;
+ transform:translateY(-1px);
+}
+[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button > *,
+[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button > *,
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type > * {
+ display:none !important;
+}
+[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button::after,
+[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button::after,
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type::after {
+ content:"Sfoglia file";
+ color:#1E3018;
+ font-size:.98rem;
+ font-weight:750;
+}
 
+/* Operational Action Buttons: Esegui analisi, Rigenera fascicolo, Elimina, Svuota */
+.st-key-btn_run_pipeline button,
+.st-key-btn_rebuild_report button,
+.st-key-btn_delete_doc button,
+.st-key-btn_delete_all button {
+ min-height:3.2rem !important;
+ height:3.2rem !important;
+ border-radius:11px !important;
+ padding:0 1.4rem !important;
+ font-size:.98rem !important;
+ font-weight:750 !important;
+ letter-spacing:-.01em !important;
+ transition:all .16s ease !important;
+ display:inline-flex !important;
+ align-items:center !important;
+ justify-content:center !important;
+ gap:.5rem !important;
+}
+.st-key-btn_run_pipeline button p,
+.st-key-btn_rebuild_report button p,
+.st-key-btn_delete_doc button p,
+.st-key-btn_delete_all button p {
+ font-size:.98rem !important;
+ font-weight:750 !important;
+ letter-spacing:-.01em !important;
+ margin:0 !important;
+}
+.st-key-btn_run_pipeline button span[data-testid="stIconMaterial"],
+.st-key-btn_rebuild_report button span[data-testid="stIconMaterial"],
+.st-key-btn_delete_doc button span[data-testid="stIconMaterial"],
+.st-key-btn_delete_all button span[data-testid="stIconMaterial"] {
+ font-size:1.25rem !important;
+ display:inline-flex !important;
+ align-items:center !important;
+}
+.st-key-btn_run_pipeline button {
+ background:#8CC63F !important;
+ color:#1E3018 !important;
+ border:1px solid #8CC63F !important;
+ box-shadow:0 4px 14px rgba(140,198,63,.32) !important;
+}
+.st-key-btn_run_pipeline button:hover {
+ background:#7DB531 !important;
+ border-color:#7DB531 !important;
+ color:#1E3018 !important;
+ transform:translateY(-1px);
+ box-shadow:0 6px 18px rgba(125,181,49,.42) !important;
+}
+.st-key-btn_run_pipeline button:active {
+ transform:translateY(0);
+ box-shadow:0 2px 8px rgba(125,181,49,.25) !important;
+}
+.st-key-btn_rebuild_report button {
+ background:#FFFFFF !important;
+ color:#244026 !important;
+ border:1.5px solid #A9C795 !important;
+ box-shadow:0 3px 12px rgba(34,62,37,.05) !important;
+}
+.st-key-btn_rebuild_report button:hover {
+ background:#F4F8F0 !important;
+ border-color:#8CC63F !important;
+ color:#1E3018 !important;
+ transform:translateY(-1px);
+ box-shadow:0 6px 16px rgba(140,198,63,.18) !important;
+}
+.st-key-btn_rebuild_report button:active {
+ transform:translateY(0);
+ box-shadow:0 2px 6px rgba(34,62,37,.05) !important;
+}
+.st-key-btn_delete_doc button {
+ background:#FFF8F7 !important;
+ color:#B42318 !important;
+ border:1.5px solid #FECDCA !important;
+ box-shadow:0 3px 10px rgba(180,35,24,.05) !important;
+}
+.st-key-btn_delete_doc button:hover {
+ background:#FEE4E2 !important;
+ border-color:#FDA29B !important;
+ color:#912018 !important;
+ transform:translateY(-1px);
+ box-shadow:0 6px 16px rgba(180,35,24,.16) !important;
+}
+.st-key-btn_delete_doc button:active {
+ transform:translateY(0);
+ box-shadow:0 2px 6px rgba(180,35,24,.10) !important;
+}
+.st-key-btn_delete_all button {
+ background:#FEF3F2 !important;
+ color:#B42318 !important;
+ border:1.5px solid #FECDCA !important;
+ box-shadow:0 3px 10px rgba(180,35,24,.06) !important;
+}
+.st-key-btn_delete_all button:hover {
+ background:#FECDCA !important;
+ border-color:#F04438 !important;
+ color:#7A1913 !important;
+ transform:translateY(-1px);
+ box-shadow:0 6px 18px rgba(180,35,24,.22) !important;
+}
+.st-key-btn_delete_all button:active {
+ transform:translateY(0);
+ box-shadow:0 2px 6px rgba(180,35,24,.12) !important;
+}
+.st-key-sel_remove_doc [data-baseweb="select"] > div {
+ min-height:3.2rem !important;
+ height:3.2rem !important;
+ border-radius:11px !important;
+}
 .kpi-grid { display:flex; gap:.8rem; flex-wrap:wrap; }
 .kpi-card { flex:1; min-width:130px; padding:1rem; background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow:0 3px 12px rgba(25,55,25,.04); }
 .kpi-label { color:var(--muted); font-size:.8rem; font-weight:600; }
@@ -304,16 +578,68 @@ hr { border-color:var(--border)!important; }
 .loader-fill { width:40%; height:100%; border-radius:99px; background:linear-gradient(90deg,#8CC63F,#C8E86D,#8CC63F); animation:shimmer 1.5s infinite ease-in-out; }
 @keyframes shimmer { 0%{transform:translateX(-110%)} 100%{transform:translateX(280%)} }
 @media(max-width:900px){
- .block-container{padding:1rem .8rem 2rem}
+ .block-container{padding:4.2rem .8rem 2rem}
  .page-hero{flex-direction:column; align-items:flex-start; padding:1.35rem 1.5rem}
  .page-hero .headline{font-size:1.7rem}
- .page-hero-brand{display:none}
+ .page-hero-slogan{flex:1 1 auto; max-width:none; text-align:left}
 }
 """
 
 
+HERO_SLOGAN = "Documenti oggi per un domani più sostenibile."
+
+# Clean vector artwork for the hero banner: rolling green hills, a low-rise green city and wind turbines.
+_HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" preserveAspectRatio="xMaxYMax slice">
+<defs>
+<linearGradient id="far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFE08F"/><stop offset="1" stop-color="#9CCB63"/></linearGradient>
+<linearGradient id="near" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8CC63F"/><stop offset="1" stop-color="#5E9A2B"/></linearGradient>
+<g id="blades"><path d="M0 0 L-2.4 -5 L0 -50 L2.4 -5Z"/><path d="M0 0 L-2.4 -5 L0 -50 L2.4 -5Z" transform="rotate(120)"/><path d="M0 0 L-2.4 -5 L0 -50 L2.4 -5Z" transform="rotate(240)"/></g>
+</defs>
+<path d="M300 190 C400 150 480 175 580 150 C700 120 820 160 960 130 L960 260 L300 260Z" fill="url(#far)" opacity=".75"/>
+<g fill="#4F7F1E" fill-opacity=".30">
+<rect x="430" y="148" width="22" height="46"/><rect x="456" y="130" width="26" height="64"/><rect x="486" y="156" width="20" height="38"/>
+<rect x="510" y="140" width="24" height="54"/><rect x="538" y="160" width="18" height="34"/>
+</g>
+<g fill="#FFFFFF" fill-opacity=".55">
+<rect x="460" y="138" width="4" height="4"/><rect x="468" y="138" width="4" height="4"/><rect x="460" y="150" width="4" height="4"/><rect x="468" y="150" width="4" height="4"/>
+<rect x="515" y="150" width="4" height="4"/><rect x="523" y="150" width="4" height="4"/><rect x="434" y="158" width="4" height="4"/><rect x="442" y="158" width="4" height="4"/>
+</g>
+<g fill="#6FA83A" fill-opacity=".85"><rect x="456" y="126" width="26" height="4" rx="2"/><rect x="510" y="136" width="24" height="4" rx="2"/></g>
+<g fill="#FFFFFF" stroke="#5E9A2B" stroke-width="1.1">
+<path d="M638 168 L640 64 L642 168Z"/><use href="#blades" transform="translate(640 64) rotate(15)"/>
+<path d="M758 172 L760 80 L762 172Z"/><use href="#blades" transform="translate(760 80) scale(.8) rotate(70)"/>
+<path d="M858 168 L860 92 L862 168Z"/><use href="#blades" transform="translate(860 92) scale(.62) rotate(40)"/>
+<path d="M908 164 L910 108 L912 164Z"/><use href="#blades" transform="translate(910 108) scale(.46) rotate(95)"/>
+</g>
+<path d="M0 214 C140 180 260 215 400 196 C560 174 700 214 860 190 C910 183 940 186 960 184 L960 260 L0 260Z" fill="url(#near)"/>
+<g fill="#FFFFFF" fill-opacity=".30"><circle cx="600" cy="232" r="18"/><circle cx="880" cy="226" r="24"/></g>
+</svg>"""
+
+
+def _svg_data_uri(svg: str) -> str:
+    return "data:image/svg+xml;utf8," + quote(" ".join(svg.split()))
+
+
+def _chevron_uri(color: str) -> str:
+    return _svg_data_uri(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='" + color +
+        "' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 4l6 6-6 6'/></svg>"
+    )
+
+
+_LEAF_ICON = (
+    "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' "
+    "stroke-linejoin='round' aria-hidden='true'><path d='M5 19c0-8 5-13 14-14 0 9-5 14-13 14'/><path d='M5 19c3-5 6-8 10-10'/></svg>"
+)
+
+
 def inject_custom_css() -> None:
-    st.markdown(f"<style>{_CSS}</style>", unsafe_allow_html=True)
+    css = (
+        _CSS.replace("__HERO_ART__", _svg_data_uri(_HERO_SVG))
+        .replace("__CHEVRON_ACTIVE__", _chevron_uri("#4F7F1E"))
+        .replace("__CHEVRON__", _chevron_uri("#7C897E"))
+    )
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def _logo_data_uri() -> str:
@@ -363,7 +689,6 @@ def render_brand_header() -> None:
                     <div class='brand-name'>inambiente</div>
                     <div class='brand-sub'>DOCUMENT INTELLIGENCE</div>
                 </div>
-                <div class='brand-zoom-pill'>🔍</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -373,22 +698,37 @@ def render_brand_header() -> None:
             show_company_identity_modal()
 
 
-def render_page_header(title: str, version: str = "", tenant: str = "") -> None:
+def render_page_header(
+    title: str,
+    version: str = "",
+    tenant: str = "",
+    subtitle: str = "",
+    module_label: str = "",
+) -> None:
     safe_title = html.escape(str(title or "Workspace"))
-    safe_tenant = html.escape(str(tenant or "Tenant non configurato"))
+    safe_tenant = html.escape(str(tenant or "Azienda non configurata"))
     safe_version = html.escape(str(version or ""))
+    safe_subtitle = html.escape(str(subtitle or ""))
+    safe_module = html.escape(str(module_label or ""))
+
+    subtitle_html = f"<div class='hero-subline-text'>{safe_subtitle}</div>" if safe_subtitle else ""
     version_badge_html = f"<span class='version-badge'>{safe_version}</span>" if safe_version else ""
+    module_pill_html = f"<span class='module-pill'>🧩 {safe_module}</span>" if safe_module else ""
+
     st.markdown(
         f"""
         <div class='page-hero'>
             <div class='page-hero-content'>
                 <div class='eyebrow'>🌱 Sustainability · Compliance Platform</div>
                 <div class='headline'>{safe_title}</div>
+                {subtitle_html}
                 <div class='subline'>
                     <span class='tenant-pill'>🏢 {safe_tenant}</span>
+                    {module_pill_html}
                     {version_badge_html}
                 </div>
             </div>
+            <div class='page-hero-slogan'>{_LEAF_ICON}<span>{html.escape(HERO_SLOGAN)}</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -423,6 +763,46 @@ def render_kpi_row(items: List[Tuple[str, object, str, str]]) -> None:
         label, value, hint, level = item
         with col:
             st.markdown(f"<div class='kpi-card'><div class='kpi-label'>{html.escape(str(label))}</div><div class='kpi-value'>{html.escape(str(value))}</div><div class='kpi-hint'>{html.escape(str(hint))}</div></div>", unsafe_allow_html=True)
+
+
+_METRIC_ICONS = {
+    "docs": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/><path d='M14 3v5h5'/><path d='M9 13h6M9 17h4'/></svg>",
+    "indexed": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='6' rx='7' ry='3'/><path d='M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6'/><path d='M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6'/></svg>",
+    "alert": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z'/><path d='M12 9v4M12 16.5v.01'/></svg>",
+}
+
+
+@dataclass(frozen=True)
+class MetricCard:
+    """Presentation-only dashboard card. `delta` (e.g. '+12% rispetto al mese scorso') is rendered only when
+    the caller supplies a real, computed figure; otherwise `note` is shown."""
+    label: str
+    value: object
+    tone: str = "green"            # green | blue | red
+    icon: str = "docs"             # docs | indexed | alert
+    info: str = ""                 # tooltip behind the (i) badge
+    note: str = ""
+    delta: Optional[str] = None
+    delta_trend: str = "up"        # up | down
+
+
+def render_metric_cards(cards: List[MetricCard]) -> None:
+    parts = []
+    for c in cards:
+        tone = c.tone if c.tone in {"green", "blue", "red"} else "green"
+        info = f"<i class='metric-info' title='{html.escape(c.info, quote=True)}'>i</i>" if c.info else ""
+        if c.delta:
+            arrow = "▼" if c.delta_trend == "down" else "▲"
+            foot = f"<div class='metric-note delta'>{arrow} {html.escape(c.delta)}</div>"
+        else:
+            foot = f"<div class='metric-note'>{html.escape(c.note)}</div>" if c.note else ""
+        parts.append(
+            f"<div class='metric-card tone-{tone}'>"
+            f"<div class='metric-icon'>{_METRIC_ICONS.get(c.icon, _METRIC_ICONS['docs'])}</div>"
+            f"<div class='metric-body'><div class='metric-label'>{html.escape(c.label)}{info}</div>"
+            f"<div class='metric-value'>{html.escape(str(c.value))}</div>{foot}</div></div>"
+        )
+    st.markdown("<div class='metric-grid'>" + "".join(parts) + "</div>", unsafe_allow_html=True)
 
 
 def render_stat_chips(items: List[Tuple[str, object, str]]) -> None:

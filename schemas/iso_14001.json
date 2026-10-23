@@ -1,6 +1,6 @@
 {
   "module_id": "iso_14001",
-  "label": "ISO 14001 — Sistema di Gestione Ambientale (SGA)",
+  "label": "Sistemi di Gestione Integrati (ISO 14001 / 9001 / 45001)",
   "version": "1.0.0",
   "extraction": {
     "system_prompt": "You are a certified ISO 14001 Environmental Management System (SGA) and legal compliance data extraction auditor. Extract structured entities with absolute fidelity to the source text. Never invent expiries, amounts, or roles. If a field is not present in the document text, return null."

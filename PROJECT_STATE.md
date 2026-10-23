@@ -4,7 +4,7 @@
 - **Current Milestone:** Step 8.5 Completed (Architectural Hardening & Governance, Derived Dates, Chat Structured Context) 🟢
 - **System Architecture:** Modular Multi-Tenant Document Intelligence & Compliance Platform
 - **Stability Status:** 100% Operational, Zero-Hallucination Verified, Fully Backward Compatible.
-- **Test Suite Status:** 41/41 Automated Pytest Tests Passing (100% Green) — verified via `python check_health.py`.
+- **Test Suite Status:** 46/46 Automated Pytest Tests Passing (100% Green) — verified via `python check_health.py`.
 
 ---
 
@@ -87,6 +87,8 @@
 - **موتور محاسبه قطعی تاریخ انقضای دوره‌های آموزشی (Deterministic Derived Dates for Training Certifications):** پیاده‌سازی لایه محاسبات انقضا (`app/extraction/calculators.py` و `normalizer.py`) با پشتیبانی از سال‌های کبیسه (`relativedelta`)، تطبیق انعطاف‌پذیر کلمات کلیدی، اعتبارسنجی Fail-fast اسکیما (`derived_dates`) در `app/extraction/registry.py`، و اتصال خودکار فیلدهای `CALCULATED` به موتور هشدارهای تقویمی سررسیدها (`app/alerts/deadlines.py`) مطابق الزامات توافقنامه ایالت-مناطق ایتالیا (Accordo Stato-Regioni) و استانداردهای دوره‌های سرپرستی (۲۴ ماه)، مدیریتی (۶۰ ماه)، تجهیزات/لیفتراک (۶۰ ماه)، آتش‌نشانی (۶۰ ماه) و کمک‌های اولیه (۳۶ ماه) بر روی هر دو اسکیمای `personnel_training` (در ماژول `iso_14001`) و `training_certificate` (در ماژول `hr_training` با نام شیت سفارشی `Attestati Formazione`). مجموع تست‌ها: ۳۳/۳۳ سبز (۱۰۰٪ پاس).
 - **تزریق کانتکست ساختاریافته و قوانین شفافیت منشأ به چت با اسناد (Document Chat Structured Context & Provenance):** پیاده‌سازی `build_document_structured_context` در `app/ai/prompts.py` با پیمایش پویا بر روی `schema.fields` و `schema.computed`، تزریق خودکار اطلاعات رکوردهای استخراج‌شده/محاسبه‌شده اسناد فعال در تب `Document Chat` به `build_rag_prompt` قبل از تکه‌های متنی، و درج راهنمای شفافیت ممیزی داده‌ها (Provenance Guideline) جهت تفکیک دقیق داده‌های متن سند (`EXTRACTED`) از محاسبات قطعی بدون توهم سیستم (`CALCULATED`). مجموع تست‌ها: ۳۸/۳۸ سبز (۱۰۰٪ پاس).
 - **انتقال کانتکست چت از UI به لایه دامنه و حذف متن اختصاصی دامنه از پرامپت عمومی (Governance — Principle 2 & 3):** منطق جمع‌آوری و فیلتر رکوردهای اسناد فعال که داخل حلقه رندر `streamlit_app.py` نشت کرده بود به تابع خالص `build_chat_structured_context(payload, active_documents)` در `app/ai/prompts.py` منتقل شد (خروجی: `ChatStructuredContext(text, guidelines)`؛ اسکیماهای ناشناخته پس از Hot Reload نادیده گرفته می‌شوند). جمله اختصاصی آموزش («corso senza scadenza / formazione generale») از `build_rag_prompt` حذف و به کلید declarative جدید `chat.guidelines` در اسکیماهای `training_certificate` و `personnel_training` منتقل شد؛ رجیستری آن را اعتبارسنجی می‌کند (`SchemaDef.chat_guidelines`) و پرامپت آن را در بخش مجزای «LINEE GUIDA SPECIFICHE DEL DOMINIO» (جدا از DOCUMENT CONTEXT) فقط برای اسکیماهای حاضر در کانتکست درج می‌کند. افزودن قانون شفافیت برای وضعیت `EDITED`. مجموع تست‌ها: ۴۱/۴۱ سبز (۱۰۰٪ پاس).
+- **نوسازی UI/UX مطابق دیزاین سیستم inambiente (فقط لایه نمایش — `app/ui/theme.py` و بخش‌های نمایشی `streamlit_app.py`):** بنر هیرو با پس‌زمینه SVG (توربین بادی و شهر سبز) و شعار رسمی، قرص‌های شیشه‌ای Tenant/Version، ناوبری سایدبار به شکل کارت با Chevron و حالت فعال سبز، انتخابگر ماژول به سبک کارتی، کارت‌های شاخص داشبورد (کامپوننت `MetricCard`/`render_metric_cards`) و کادر بارگذاری فایل با دکمه «Sfoglia file». درصدهای روند ماهانه عمداً با عدد ثابت نمایش داده نمی‌شوند (تاریخچه واقعی وجود ندارد)؛ پارامتر `delta` آماده است.
+- **ارتقای استایل دکمه‌های عملیاتی کلیدی (`app/ui/theme.py` + `app/ui/streamlit_app.py`):** پیاده‌سازی استایل مدرن و هماهنگ با دکمه بارگذاری برای دکمه‌های «Esegui analisi completa»، «Rigenera solo fascicolo»، «Elimina documento» و «Svuota tutto» با ارتفاع استاندارد `3.2rem`، پدینگ سخاوتمندانه، تایپوگرافی خوانا (وزن ۷۵۰، لتر اسپیسینگ منفی)، سایه‌های نرم و بازخورد لمسی (Hover/Active Transition) به همراه هم‌ترازسازی فیلد انتخابگر سند (`min-height: 3.2rem`). مجموع تست‌ها: ۴۷/۴۷ سبز (۱۰۰٪ پاس).
 
 ---
 
@@ -100,7 +102,8 @@
 - [x] Audit-proof scoped deliverables (Platform 4-Sheet Excel Exporter + Custom Word Staged Sections & Sign-offs).
 - [x] Compliance deadline monitoring & alert dispatcher with simulation guardrails (UUID5, Deduplication, SMTP/SMS).
 - [x] Structured context & provenance transparency rules in RAG document chat.
-- [ ] UI/UX Alignment: Modernize Streamlit frontend to match inambiente design system (Hero banner with sustainability theme, Card-based Sidebar Navigation pills with chevrons, and KPI metric cards).
+- [x] UI/UX Alignment: Streamlit frontend modernized to the inambiente design system — SVG hero banner (wind turbines + green city, official slogan, frosted-glass tenant/version pills), card-style sidebar navigation with chevrons and card-style module selector, dashboard metric cards, styled file dropzone (`app/ui/theme.py`, presentation-only; verified in a real browser at desktop and narrow widths).
+  - [ ] Month-over-month trend lines on the metric cards (e.g. "+12% rispetto al mese scorso"): the card component already supports `delta`, but it is intentionally not fed until real historical counters are persisted (no hardcoded figures).
 - [ ] Immediate production tuning (operational checklist):
   - [ ] Configure real SMTP / Twilio SMS credentials in `.env` (`SMTP_*`, `TWILIO_*`) so alerts stop running in simulation mode.
   - [ ] Schedule the daily alert scan (Windows Task Scheduler / cron) running `python -m app.alerts.run`.

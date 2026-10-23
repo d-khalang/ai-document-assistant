@@ -9,9 +9,13 @@
 - **Last shipped:** deterministic `derived_dates` (training-certificate expiry); structured
   extracted-metadata context + provenance rules in Document Chat, now built by the pure function
   `build_chat_structured_context` with domain wording declared in `schemas/*.json → chat.guidelines`.
-- **Baseline health:** `python check_health.py` → 6 modules / 10 schemas / 1 fallback / 41 tests green.
-- **Remaining in Phase 1:** UI/UX alignment with the inambiente design system (hero banner,
-  card-based sidebar pills with chevrons, KPI metric cards) + Phase-1 debt in §6.
+- **Baseline health:** `python check_health.py` → 6 modules / 10 schemas / 1 fallback / 45 tests green.
+- **UI/UX alignment (inambiente design system) — done:** SVG hero banner + slogan + glass pills, card-style
+  sidebar nav with chevrons and module selector, metric cards, styled dropzone (`app/ui/theme.py`).
+  Metric cards support an optional `delta` (month-over-month) but it is only shown with a real
+  computed figure — never hardcode trend numbers (no history exists yet; needs persisted counters).
+- **Remaining in Phase 1:** operational checklist in `PROJECT_STATE.md` (SMTP/Twilio creds, daily
+  scheduler) + Phase-1 debt in §6.
 
 ### Official roadmap — "From MVP to fully on-prem"
 | Phase | Horizon | Stack / scope |

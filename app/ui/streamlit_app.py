@@ -15,7 +15,9 @@ from PIL import Image
 FAVICON_PATH = Path(__file__).resolve().parent / "assets" / "favicon.png"
 from app.ui.theme import (
     inject_custom_css,
+    MetricCard,
     render_kpi_row,
+    render_metric_cards,
     render_stat_chips,
     render_brand_header,
     render_page_header,
@@ -254,10 +256,21 @@ def render_platform_pipeline(preferred_module: str) -> None:
                 ss.routing_overrides.pop(name, None)
 
         c_run, c_rebuild = st.columns(2)
-        run = c_run.button("Esegui analisi completa", icon=":material/play_arrow:", type="primary", use_container_width=True,
-                           help="Estrae solo i documenti non ancora analizzati, sincronizza le scadenze e genera il fascicolo.")
-        rebuild = c_rebuild.button("Rigenera solo fascicolo", icon=":material/refresh:", use_container_width=True,
-                                   help="Ricostruisce il fascicolo Excel includendo le modifiche fatte nella griglia di revisione.")
+        run = c_run.button(
+            "Esegui analisi completa",
+            icon=":material/play_arrow:",
+            type="primary",
+            use_container_width=True,
+            key="btn_run_pipeline",
+            help="Estrae solo i documenti non ancora analizzati, sincronizza le scadenze e genera il fascicolo.",
+        )
+        rebuild = c_rebuild.button(
+            "Rigenera solo fascicolo",
+            icon=":material/refresh:",
+            use_container_width=True,
+            key="btn_rebuild_report",
+            help="Ricostruisce il fascicolo Excel includendo le modifiche fatte nella griglia di revisione.",
+        )
 
         if run:
             for doc, route in effective.items():
@@ -372,11 +385,11 @@ def render_ui():
         page = st.radio(
             "Navigazione principale",
             options=[
-                "📄  Document Hub & Batch Pipeline",
-                "🏢  Profilo Aziendale / Tenant",
-                "💬  Document Chat (RAG)",
-                "📊  Estrazione & Revisione",
-                "⏰  Scadenze & Allerte",
+                ":material/folder_open:  Area Documentale & Pipeline",
+                ":material/business:  Profilo Anagrafico & Utente",
+                ":material/chat:  Chat Documentale",
+                ":material/analytics:  Estrazione & Revisione",
+                ":material/notifications_active:  Scadenze & Allerte",
             ],
             key="workspace_page",
             label_visibility="collapsed",
@@ -393,7 +406,7 @@ def render_ui():
         current_module = modules[selected_mod_id]
         company_name = (ss.company_profile.get("company_name") or "").strip()
         st.markdown(
-            f"<div class='tenant-mini'><span class='tenant-dot'></span><div><b>{company_name or 'Tenant non configurato'}</b>"
+            f"<div class='tenant-mini'><span class='tenant-dot'></span><div><b>{company_name or 'Azienda non configurata'}</b>"
             f"<small>{len(ss.indexed_documents)} documenti attivi</small></div></div>",
             unsafe_allow_html=True,
         )
@@ -414,11 +427,45 @@ def render_ui():
                 key="btn_reset_index", on_click=_reset_vector_index_callback,
             )
 
-    render_page_header(current_module.label, current_module.version, company_name)
+    page_hero_config = {
+        "Area Documentale": {
+            "title": "Document Hub & Batch Pipeline",
+            "subtitle": "Caricamento, anteprima, routing deterministico ed elaborazione massiva dei documenti.",
+        },
+        "Profilo Anagrafico": {
+            "title": "Profilo Anagrafico Aziendale",
+            "subtitle": "Gestione anagrafica aziendale, sedi operative, direttori tecnici e firmatari ufficiali.",
+        },
+        "Chat Documentale": {
+            "title": "Assistente Documentale Intelligente",
+            "subtitle": "Interrogazione semantica sui documenti attivi e sui metadati strutturati estratti.",
+        },
+        "Estrazione": {
+            "title": "Estrazione Dati & Revisione",
+            "subtitle": "Validazione strutturata dei campi estratti, revisione umana e generazione report ufficiali.",
+        },
+        "Scadenze": {
+            "title": "Monitoraggio Scadenze & Conformità",
+            "subtitle": "Controllo continuo dei rinnovi, obblighi di legge e dispatching allerte e-mail/SMS.",
+        },
+    }
+
+    hero_meta = next((cfg for key, cfg in page_hero_config.items() if key in page), {
+        "title": "Document Hub & Batch Pipeline",
+        "subtitle": "Piattaforma avanzata di conformità e intelligenza documentale.",
+    })
+
+    render_page_header(
+        title=hero_meta["title"],
+        version=f"v{current_module.version}",
+        tenant=company_name or "Azienda non configurata",
+        subtitle=hero_meta["subtitle"],
+        module_label=current_module.label,
+    )
 
     # PAGE 1 — upload, preview, routing and batch pipeline
-    if page.startswith("📄"):
-        section_title("Document Hub & Batch Pipeline", "Caricamento, anteprima, routing deterministico ed esportazione del fascicolo.")
+    if "Area Documentale" in page:
+        section_title("Area Documentale & Pipeline", "Caricamento, anteprima, routing deterministico ed esportazione del fascicolo.")
         uploaded_files = st.file_uploader(
             "Aggiungi documenti all'area di lavoro",
             type=["pdf", "docx", "xlsx", "xls", "jpg", "jpeg", "png", "webp"],
@@ -441,10 +488,17 @@ def render_ui():
                     status.update(label="Indicizzazione completata", state="complete", expanded=False)
 
         docs = ss.indexed_documents
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Documenti attivi", len(docs))
-        k2.metric("Indicizzati", sum(1 for d in docs.values() if d.get("status") == "Ready"))
-        k3.metric("Errori di lettura", len(ss.processing_errors))
+        n_ready = sum(1 for d in docs.values() if d.get("status") == "Ready")
+        n_errors = len(ss.processing_errors)
+        render_metric_cards([
+            MetricCard("Documenti attivi", len(docs), tone="green", icon="docs",
+                       info="Documenti caricati nell'area di lavoro corrente.", note="Nell'area di lavoro"),
+            MetricCard("Indicizzati", n_ready, tone="blue", icon="indexed",
+                       info="Documenti letti e pronti per ricerca e chat.", note="Pronti per la ricerca"),
+            MetricCard("Errori di lettura", n_errors, tone="red" if n_errors else "green", icon="alert",
+                       info="Documenti che non è stato possibile leggere o indicizzare.",
+                       note="Da verificare" if n_errors else "Nessun errore"),
+        ])
         if docs:
             st.markdown("#### Documenti nell'area di lavoro")
             rows = [{"Documento": n, "Pagine": len(m.get("pages", [])), "Segmenti": m.get("chunks", 0), "Stato": m.get("status", "Ready")} for n, m in docs.items()]
@@ -459,13 +513,13 @@ def render_ui():
                     label_visibility="collapsed",
                 )
             with c_del_btn:
-                if st.button("Elimina documento", icon=":material/delete:", use_container_width=True):
+                if st.button("Elimina documento", icon=":material/delete:", use_container_width=True, key="btn_delete_doc"):
                     if target_to_remove:
                         remove_single_document(target_to_remove)
                         st.toast(f"Documento '{target_to_remove}' rimosso dall'area di lavoro.")
                         st.rerun()
             with c_del_all:
-                if st.button("Svuota tutto", icon=":material/delete_sweep:", use_container_width=True):
+                if st.button("Svuota tutto", icon=":material/delete_sweep:", use_container_width=True, key="btn_delete_all"):
                     for d in list(docs.keys()):
                         remove_single_document(d)
                     reset_conversation()
@@ -503,11 +557,11 @@ def render_ui():
             st.info("Carica uno o più documenti per avviare il workspace.")
 
     # PAGE 2 — tenant profile
-    elif page.startswith("🏢"):
-        section_title("Profilo Aziendale / Tenant", "Metadati riutilizzati nelle intestazioni e nelle firme dei report ufficiali.")
+    elif "Profilo Anagrafico" in page:
+        section_title("Profilo Anagrafico & Utente", "Metadati riutilizzati nelle intestazioni e nelle firme dei report ufficiali.")
         prof = ss.company_profile
         with st.container(border=True):
-            st.markdown("#### Identità legale e sede")
+            st.markdown("#### Anagrafica Aziendale")
             c1, c2 = st.columns(2, gap="large")
             with c1:
                 c_name = st.text_input("Ragione sociale", value=prof.get("company_name", ""), placeholder="inambiente S.r.l.", key="tenant_company_name")
@@ -531,8 +585,8 @@ def render_ui():
             st.caption(f"P.IVA: {c_vat.strip() or '—'} · Responsabile SGA: {c_rsga.strip() or '—'} · Direzione tecnica: {c_dir.strip() or '—'}")
 
     # PAGE 3 — full-page RAG chat. Top-K remains config-driven.
-    elif page.startswith("💬"):
-        section_title("Document Chat", "Interroga il contenuto dei documenti attivi. Le risposte si basano sui passaggi recuperati.")
+    elif "Chat Documentale" in page:
+        section_title("Chat Documentale", "Interroga il contenuto dei documenti attivi. Le risposte si basano sui passaggi recuperati e sui metadati strutturati.")
         history = get_conversation_history(ss.conversation_id)
         with st.container(height=500, border=True):
             if not history:
@@ -543,7 +597,7 @@ def render_ui():
         query = st.chat_input("Scrivi una domanda sui documenti attivi…")
         if query:
             if not ss.indexed_documents:
-                st.warning("Prima carica almeno un documento nella pagina Document Hub.")
+                st.warning("Prima carica almeno un documento nella pagina Area Documentale & Pipeline.")
             else:
                 with loader("Ricerca nei documenti", "Recupero semantico e generazione della risposta…", "orbit"):
                     try:
@@ -558,7 +612,7 @@ def render_ui():
                         st.error(f"Impossibile completare la ricerca: {exc}")
 
     # PAGE 4 — extraction, human review, official exports
-    elif page.startswith("📊"):
+    elif "Estrazione" in page:
         mid = current_module.module_id
         section_title("Estrazione & Revisione", "Estrazione strutturata, revisione manuale e report ufficiali Excel/Word.")
         schemas = list(current_module.schemas)
@@ -580,7 +634,7 @@ def render_ui():
         )
         schema = current_module.schemas[schema_name]
         if not ss.indexed_documents:
-            st.info("Carica prima i documenti dalla pagina Document Hub.")
+            st.info("Carica prima i documenti dalla pagina Area Documentale & Pipeline.")
         else:
             doc_options = ["ALL ACTIVE DOCUMENTS"] + list(ss.indexed_documents)
             target = st.selectbox("Documenti sorgente", doc_options, key=f"doc_target_{mid}")
@@ -625,7 +679,7 @@ def render_ui():
                 st.download_button("Scarica report Word", word_bytes, file_name=f"Verbale_{prefix}_{datetime.now():%Y%m%d}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", icon=":material/description:", use_container_width=True)
 
     # PAGE 5 — deadlines and notifications
-    elif page.startswith("⏰"):
+    elif "Scadenze" in page:
         section_title("Monitoraggio Scadenze & Allerte", "Scadenze attive, stato di conformità e gestione dei canali di notifica.")
         active = get_active_deadlines()
         today = datetime.now().date()

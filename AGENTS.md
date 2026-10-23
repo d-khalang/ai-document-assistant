@@ -43,7 +43,7 @@ This document defines the non-negotiable architectural invariants, development w
 - Document removal must evict records and deactivate deadlines (`deactivate_deadlines_for_document`, `deactivate_missing_deadlines`).
 
 ### 🔴 Principle 6: Test-Driven Stability & Zero Regressions
-- The entire offline test suite (`pytest -q -p no:cacheprovider`) must remain 100% green before concluding any task (v2.6 baseline: 41/41 tests passing). The authoritative gate is `python check_health.py` (exit code 0); never lower the count by deleting or skipping tests.
+- The entire offline test suite (`pytest -q -p no:cacheprovider`) must remain 100% green before concluding any task (v2.6 baseline: 45/45 tests passing). The authoritative gate is `python check_health.py` (exit code 0); never lower the count by deleting or skipping tests.
 - Any new architectural feature or bug fix must be accompanied by offline unit/integration tests in `tests/`.
 
 ---
