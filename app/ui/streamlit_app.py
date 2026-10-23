@@ -1,3 +1,4 @@
+import html
 import sys
 from pathlib import Path
 
@@ -406,7 +407,8 @@ def render_ui():
         current_module = modules[selected_mod_id]
         company_name = (ss.company_profile.get("company_name") or "").strip()
         st.markdown(
-            f"<div class='tenant-mini'><span class='tenant-dot'></span><div><b>{company_name or 'Azienda non configurata'}</b>"
+            f"<div class='tenant-mini'><span class='tenant-badge{'' if company_name else ' is-empty'}'></span>"
+            f"<div><b>{html.escape(company_name or 'Azienda non configurata')}</b>"
             f"<small>{len(ss.indexed_documents)} documenti attivi</small></div></div>",
             unsafe_allow_html=True,
         )
@@ -495,7 +497,7 @@ def render_ui():
                        info="Documenti caricati nell'area di lavoro corrente.", note="Nell'area di lavoro"),
             MetricCard("Indicizzati", n_ready, tone="blue", icon="indexed",
                        info="Documenti letti e pronti per ricerca e chat.", note="Pronti per la ricerca"),
-            MetricCard("Errori di lettura", n_errors, tone="red" if n_errors else "green", icon="alert",
+            MetricCard("Errori di lettura", n_errors, tone="red", icon="alert",
                        info="Documenti che non è stato possibile leggere o indicizzare.",
                        note="Da verificare" if n_errors else "Nessun errore"),
         ])

@@ -5,6 +5,7 @@ import base64
 import html
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
 from urllib.parse import quote
@@ -44,6 +45,8 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color:var(--muted)!important; font-size:.9rem!important; line-height:1.55; }
 [data-testid="stSidebar"] { background:#FFFFFF; border-right:1px solid var(--border); }
 [data-testid="stSidebar"] > div:first-child { padding-top:1.2rem; }
+/* Streamlit 1.5x opens the sidebar at ~255px, too narrow for icon + label + chevron cards: keep a usable minimum (expanded only) */
+[data-testid="stSidebar"][aria-expanded="true"] { min-width:19rem; }
 /* Sidebar navigation cards: white card, soft border, chevron at the end of the row */
 [data-testid="stSidebar"] [data-testid="stRadio"] { width:100%; }
 [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap:.55rem; }
@@ -54,11 +57,14 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
  align-items:center;
  gap:.4rem;
  width:100%;
- padding:.85rem 1rem .85rem 1.15rem;
+ padding:.85rem 1rem .85rem 3.35rem;
  margin-bottom:0;
  border-radius:14px;
  border:1.5px solid var(--border);
- background:#FFFFFF;
+ background-color:#FFFFFF;
+ background-repeat:no-repeat;
+ background-position:1.1rem center;
+ background-size:22px 22px;
  box-shadow:0 2px 8px rgba(34,62,37,.04);
  cursor:pointer;
  overflow:hidden;
@@ -67,11 +73,13 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) p,
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[data-testid="stMarkdownContainer"] p,
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span {
- font-size:1.05rem !important;
+ font-size:1.02rem !important;
  font-weight:600;
  color:#2D3D30;
  line-height:1.35;
  letter-spacing:-.01em;
+ overflow-wrap:normal;
+ word-break:normal;
 }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[data-testid="stMarkdownContainer"] p {
  display:flex;
@@ -79,25 +87,27 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
  gap:.6rem;
  margin:0 !important;
 }
+/* The ":material/...:" shortcodes in the option labels stay in the Python source, but the icon font is not
+   relied upon (it renders as clipped ligature text when the font is late): the icon is a 22px SVG drawn as the
+   card background, matched by child position (see _NAV_ICON_PATHS). */
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span[data-testid="stIconMaterial"],
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span[role="img"][translate="no"],
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span.material-symbols-rounded,
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) span.material-symbols-sharp {
- font-size:1.3rem !important;
- width:1.3rem;
- height:1.3rem;
- line-height:1;
- color:#4F7F1E;
- flex-shrink:0;
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"] span[data-testid="stIconMaterial"],
-[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked) span[data-testid="stIconMaterial"],
-[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"] span[data-testid="stIconMaterial"] {
- color:#2E6212;
-}
-/* Hide the default circular radio indicator */
-[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) > div > div:first-child:not(:only-child),
-[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) div[class*="e1mpz0hj4"] {
  display:none !important;
+}
+__NAV_ICON_RULES__
+/* Hide the default circular radio indicator (BaseWeb <= 1.5x: label > div; react-aria 1.6x: stRadioOption > div > div) */
+[data-testid="stSidebar"] [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child:not(:has([data-testid="stMarkdownContainer"])),
+[data-testid="stSidebar"] [data-testid="stRadio"] [data-testid="stRadioOption"] > div > div:first-child:not(:has([data-testid="stMarkdownContainer"])) {
+ display:none !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]) input[type="radio"] {
+ position:absolute;
+ opacity:0;
+ width:0;
+ height:0;
+ pointer-events:none;
 }
 /* Chevron ">" pinned to the end of every row */
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])::after {
@@ -110,7 +120,7 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
  transition:transform .2s ease;
 }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):hover {
- background:#F7FBF2;
+ background-color:#F7FBF2;
  border-color:#C9DEB8;
  box-shadow:0 4px 14px rgba(140,198,63,.14);
 }
@@ -119,7 +129,7 @@ h3 { font-size:1.2rem !important; font-weight:700 !important; }
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[data-selected="true"],
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"]):has(input:checked),
 [data-testid="stSidebar"] [data-testid="stRadio"] label:not([data-testid="stWidgetLabel"])[aria-checked="true"] {
- background:#EEF7E3 !important;
+ background-color:#EEF7E3 !important;
  border-color:#8CC63F !important;
  box-shadow:0 4px 16px rgba(140,198,63,.20) !important;
 }
@@ -189,7 +199,37 @@ hr { border-color:var(--border)!important; }
 .tenant-mini { display:flex; gap:.65rem; align-items:center; padding:.8rem .7rem; margin:.65rem 0; background:#F4F8F0; border:1px solid #E0EAD8; border-radius:12px; overflow-wrap:anywhere; }
 .tenant-mini b { display:block; color:#29452A; font-size:.88rem; }
 .tenant-mini small { display:block; color:#6B7B69; margin-top:.15rem; font-size:.78rem; }
-.tenant-dot { display:block; width:10px; height:10px; flex:0 0 10px; border-radius:50%; background:#8CC63F; box-shadow:0 0 0 4px #E2F1D2; }
+.tenant-badge {
+ display:block;
+ flex:0 0 36px;
+ width:36px;
+ height:36px;
+ border-radius:11px;
+ background:#FFFFFF url("__TENANT_ICON__") center / 20px 20px no-repeat;
+ border:1px solid #D5E5C6;
+ box-shadow:0 2px 6px rgba(79,127,30,.10);
+}
+.tenant-badge.is-empty { background-image:url("__TENANT_ICON_EMPTY__"); border-style:dashed; border-color:#C9D3C6; box-shadow:none; }
+
+/* Company identity modal: dialog sized to the logo, logo centred and symmetric */
+[role="dialog"]:has(.identity-modal) { width:min(700px,94vw) !important; max-width:94vw !important; margin-inline:auto !important; }
+.identity-modal { display:flex; flex-direction:column; align-items:center; gap:1.1rem; }
+.identity-modal .identity-logo {
+ display:block;
+ width:100% !important;
+ max-width:560px !important;
+ height:auto;
+ margin:0 auto;
+ object-fit:contain;
+ background:#fff;
+ border:1px solid var(--border);
+ border-radius:16px;
+ box-shadow:0 4px 18px rgba(34,62,37,.07);
+}
+.identity-copy { width:100%; max-width:560px; text-align:center; }
+.identity-copy h2 { margin:0; padding:0; color:#1F3424; font-weight:800; letter-spacing:-.02em; }
+.identity-tag { color:#4F7F1E; font-weight:700; letter-spacing:.08em; font-size:.82rem; text-transform:uppercase; margin:.4rem 0 .8rem; }
+.identity-copy p { color:#556658; font-size:.95rem; line-height:1.6; margin:0; }
 
 /* Interactive brand card at the top of the sidebar */
 .brand-card-container {
@@ -368,19 +408,19 @@ hr { border-color:var(--border)!important; }
 .page-hero-slogan svg { flex:0 0 26px; width:26px; height:26px; color:#4F7F1E; }
 
 /* Dashboard metric cards */
-.metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1rem; margin:.4rem 0 1.5rem; }
+.metric-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1rem; margin:.4rem 0 1.5rem; }
 .metric-card {
  display:flex;
- gap:1rem;
- align-items:flex-start;
- padding:1.15rem 1.25rem;
+ gap:1.2rem;
+ align-items:center;
+ padding:1.3rem 1.4rem;
  background:#fff;
  border:1.5px solid var(--border);
  border-radius:18px;
  box-shadow:0 4px 18px rgba(34,62,37,.05);
 }
-.metric-icon { display:grid; place-items:center; flex:0 0 48px; width:48px; height:48px; border-radius:14px; }
-.metric-icon svg { width:26px; height:26px; }
+.metric-icon { display:grid; place-items:center; flex:0 0 64px; width:64px; height:64px; border-radius:18px; }
+.metric-icon svg { width:34px; height:34px; }
 .metric-body { min-width:0; }
 .metric-label { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:.92rem; font-weight:650; }
 .metric-info {
@@ -389,69 +429,97 @@ hr { border-color:var(--border)!important; }
 }
 .metric-value { color:#1F3424; font-size:2.4rem; font-weight:850; line-height:1.1; letter-spacing:-.03em; margin-top:.25rem; }
 .metric-note { margin-top:.4rem; font-size:.85rem; font-weight:650; color:var(--muted); }
-.metric-card.tone-green .metric-icon { background:#EEF7E3; color:#4F7F1E; }
-.metric-card.tone-blue  .metric-icon { background:#E8F1FD; color:#1D5FB8; }
-.metric-card.tone-red   .metric-icon { background:#FDECEA; color:#B42318; }
+.metric-card.tone-green .metric-icon { background:#E6F4D4; color:#4F7F1E; }
+.metric-card.tone-blue  .metric-icon { background:#DDEBFC; color:#1D5FB8; }
+.metric-card.tone-red   .metric-icon { background:#FCE3DE; color:#C4412F; }
 .metric-card.tone-green .metric-note.delta { color:#2E7D32; }
 .metric-card.tone-blue  .metric-note.delta { color:#1D5FB8; }
 .metric-card.tone-red   .metric-note.delta { color:#B42318; }
 
-/* File dropzone: soft dashed frame, single green action button on the right */
+/* File dropzone: Italian copy, upload illustration on the left, single green "Sfoglia file" button on the right.
+   Streamlit's own texts (1.50: "Drag and drop files here" / "Limit ..." / "Browse files"; 1.6x: "Upload") are hidden
+   and replaced through pseudo-elements, so the result does not depend on the Streamlit version's inner markup. */
 [data-testid="stFileUploader"] { border:none; padding:0; background:transparent; }
-[data-testid="stFileUploaderDropzone"] {
+[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"] {
+ position:relative;
+ display:flex;
+ align-items:center;
+ gap:1rem;
+ min-height:7.6rem;
+ padding:1.2rem 1.6rem 1.2rem 8.6rem;
  border:1.5px dashed #A9C795;
  border-radius:18px;
- background:#FAFDF7;
- padding:1.15rem 1.4rem;
+ background:#FAFDF7 url("__UPLOAD_ART__") no-repeat 1.5rem center / 80px 80px;
+ transition:border-color .2s ease, background-color .2s ease;
+}
+[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"]:hover { border-color:#8CC63F; background-color:#F3FAEA; }
+/* Text column: native children hidden, Italian copy drawn by ::before / ::after */
+[data-testid="stFileUploaderDropzoneInstructions"] {
+ order:1;
+ flex:1 1 auto;
+ display:flex;
+ flex-direction:column;
+ gap:.2rem;
+ min-width:0;
+ align-items:flex-start !important;
+ justify-content:center;
+ text-align:left !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] > * { display:none !important; }
+[data-testid="stFileUploaderDropzoneInstructions"]::before {
+ content:"Trascina qui i file";
+ color:#1F3424;
+ font-size:1.08rem;
+ font-weight:750;
+ letter-spacing:-.01em;
+}
+[data-testid="stFileUploaderDropzoneInstructions"]::after {
+ content:"PDF, Word, Excel e immagini \2014  oppure selezionali dal computer";
+ color:var(--muted);
+ font-size:.9rem;
+ font-weight:500;
+ line-height:1.4;
+}
+/* Action button (and the wrapper Streamlit puts around it) pushed to the right edge */
+[data-testid="stFileUploaderDropzone"] > button,
+[data-testid="stFileUploaderDropzone"] > div:has(button),
+[data-testid="stFileUploaderDropzone"] > span:has(button) { order:2; margin-left:auto; flex:0 0 auto; }
+[data-testid="stFileUploaderDropzone"] button {
+ display:inline-flex !important;
  align-items:center;
- transition:border-color .2s ease, background .2s ease;
-}
-[data-testid="stFileUploaderDropzone"]:hover { border-color:#8CC63F; background:#F3FAEA; }
-[data-testid="stFileUploaderDropzone"] > span:has(button), [data-testid="stFileUploaderDropzone"] > div:has(button) { order:2; margin-left:auto; }
-[data-testid="stFileUploaderDropzoneInstructions"] { order:1; }
-[data-testid="stFileUploaderDropzoneInstructions"] span::before { content:"Trascina qui i file oppure selezionali dal computer"; display:block; color:#2D3D30; font-size:1rem; font-weight:650; margin-bottom:.15rem; }
-
-/* Hide any duplicate/inline button inside instructions or duplicate container siblings */
-[data-testid="stFileUploaderDropzoneInstructions"] button,
-[data-testid="stFileUploaderDropzone"] > span:has(button) ~ span:has(button),
-[data-testid="stFileUploaderDropzone"] > div:has(button) ~ div:has(button),
-[data-testid="stFileUploaderDropzone"] > span:has(button) ~ div:has(button),
-[data-testid="stFileUploaderDropzone"] > div:has(button) ~ span:has(button),
-[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:nth-of-type(n+2) {
- display:none !important;
-}
-
-/* Style only the single primary Browse/Upload action button */
-[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button,
-[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button,
-[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type {
- background:#8CC63F !important;
- border:1px solid #8CC63F !important;
- border-radius:11px !important;
+ justify-content:center;
  min-height:2.75rem;
  min-width:9rem;
  padding:0 1.5rem !important;
+ background:#8CC63F !important;
+ border:1px solid #8CC63F !important;
+ border-radius:11px !important;
  box-shadow:0 4px 12px rgba(140,198,63,.30);
+ font-size:0 !important;
+ line-height:0 !important;
+ color:transparent !important;
  transition:background .16s ease, transform .16s ease;
 }
-[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button:hover,
-[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button:hover,
-[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type:hover {
- background:#7DB531 !important;
- transform:translateY(-1px);
-}
-[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button > *,
-[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button > *,
-[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type > * {
- display:none !important;
-}
-[data-testid="stFileUploaderDropzone"] > span:has(button):first-of-type button::after,
-[data-testid="stFileUploaderDropzone"] > div:has(button):first-of-type button::after,
-[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"]:first-of-type::after {
+[data-testid="stFileUploaderDropzone"] button:hover { background:#7DB531 !important; transform:translateY(-1px); }
+/* Whatever the button contains (text node, markdown wrapper, icon) is hidden: only the Italian label shows */
+[data-testid="stFileUploaderDropzone"] button > * { display:none !important; }
+[data-testid="stFileUploaderDropzone"] button::after {
  content:"Sfoglia file";
  color:#1E3018;
  font-size:.98rem;
  font-weight:750;
+ line-height:1.2;
+}
+@media (max-width:640px) {
+ [data-testid="stFileUploader"] [data-testid="stFileUploaderDropzone"] {
+  flex-direction:column;
+  align-items:flex-start;
+  padding:6.2rem 1.2rem 1.2rem;
+  background-position:1.2rem 1.1rem;
+ }
+ [data-testid="stFileUploaderDropzone"] > button,
+ [data-testid="stFileUploaderDropzone"] > div:has(button),
+ [data-testid="stFileUploaderDropzone"] > span:has(button) { margin-left:0; }
 }
 
 /* Operational Action Buttons: Esegui analisi, Rigenera fascicolo, Elimina, Svuota */
@@ -627,6 +695,65 @@ def _chevron_uri(color: str) -> str:
     )
 
 
+# Sidebar navigation icons, in the order of the st.radio options (matched by child position).
+_NAV_ICON_PATHS = (
+    # Area Documentale & Pipeline — folder
+    "<path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/>",
+    # Profilo Anagrafico & Utente — office building
+    "<rect x='5' y='3' width='14' height='18' rx='1.5'/><path d='M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2'/>",
+    # Chat Documentale — speech bubble
+    "<path d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.3A8 8 0 1 1 21 12z'/><path d='M8.5 12h.01M12 12h.01M15.5 12h.01'/>",
+    # Estrazione & Revisione — bar chart
+    "<path d='M4 20h16M7 20v-7M12 20V5M17 20v-10'/>",
+    # Scadenze & Allerte — calendar with clock hand
+    "<rect x='3.5' y='5' width='17' height='15.5' rx='2'/><path d='M3.5 10h17M8 3v4M16 3v4M12 13v3l2 1.2'/>",
+)
+
+_NAV_GROUP = '[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]'
+
+
+def _line_icon_uri(paths: str, color: str, stroke: str = "1.8") -> str:
+    return _svg_data_uri(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color +
+        "' stroke-width='" + stroke + "' stroke-linecap='round' stroke-linejoin='round'>" + paths + "</svg>"
+    )
+
+
+def _nav_icon_rules() -> str:
+    """One rule per option for the idle icon and one (higher specificity) for the checked card.
+
+    The card <label> is a direct child of the radiogroup in Streamlit 1.5x (BaseWeb) but sits inside a per-option
+    wrapper <div> in 1.6x (react-aria), so both shapes are targeted by child position."""
+    rules = []
+    for i, paths in enumerate(_NAV_ICON_PATHS, start=1):
+        idle, active = _line_icon_uri(paths, "#4F7F1E"), _line_icon_uri(paths, "#2E6212", "2")
+
+        def sel(state: str = "") -> str:
+            return f"{_NAV_GROUP} > label:nth-child({i}){state}, {_NAV_GROUP} > :nth-child({i}) > label{state}"
+
+        rules.append(f'{sel()} {{ background-image:url("{idle}"); }}')
+        for state in ('[data-selected="true"]', ":has(input:checked)"):
+            rules.append(f'{sel(state)} {{ background-image:url("{active}"); }}')
+    return "\n".join(rules)
+
+
+# Dropzone illustration: soft disc, green cloud with white upward arrow, leaves around it.
+_UPLOAD_ART_SVG = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'>
+<circle cx='48' cy='48' r='46' fill='#EEF7E3'/>
+<path d='M16 34c0-9 7-15 16-15 0 9-7 15-16 15z' fill='#6FA83A'/>
+<path d='M16 34c4-6 8-10 14-13' stroke='#EEF7E3' stroke-width='1.4' fill='none' stroke-linecap='round'/>
+<path d='M80 38c0-8-6-13-13-13 0 8 6 13 13 13z' fill='#A8D56A'/>
+<path d='M74 74c-7 0-12-5-12-11 7 0 12 5 12 11z' fill='#6FA83A'/>
+<g fill='#8CC63F'><circle cx='37' cy='55' r='11'/><circle cx='51' cy='46' r='15'/><circle cx='65' cy='55' r='10'/><rect x='37' y='55' width='28' height='11'/></g>
+<path d='M51 59V40M43 47l8-8 8 8' stroke='#FFFFFF' stroke-width='4.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/>
+</svg>"""
+
+# Company tag shown in the sidebar: office building (configured) / dashed variant (not configured yet).
+_TENANT_PATHS = (
+    "<rect x='5' y='3' width='14' height='18' rx='1.5'/><path d='M9 7h2M13 7h2M9 11h2M13 11h2'/><path d='M10 21v-4h4v4'/>"
+)
+
+
 _LEAF_ICON = (
     "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' "
     "stroke-linejoin='round' aria-hidden='true'><path d='M5 19c0-8 5-13 14-14 0 9-5 14-13 14'/><path d='M5 19c3-5 6-8 10-10'/></svg>"
@@ -635,43 +762,45 @@ _LEAF_ICON = (
 
 def inject_custom_css() -> None:
     css = (
-        _CSS.replace("__HERO_ART__", _svg_data_uri(_HERO_SVG))
+        _CSS.replace("__NAV_ICON_RULES__", _nav_icon_rules())
+        .replace("__HERO_ART__", _svg_data_uri(_HERO_SVG))
+        .replace("__UPLOAD_ART__", _svg_data_uri(_UPLOAD_ART_SVG))
+        .replace("__TENANT_ICON_EMPTY__", _line_icon_uri(_TENANT_PATHS, "#8A968C"))
+        .replace("__TENANT_ICON__", _line_icon_uri(_TENANT_PATHS, "#4F7F1E"))
         .replace("__CHEVRON_ACTIVE__", _chevron_uri("#4F7F1E"))
         .replace("__CHEVRON__", _chevron_uri("#7C897E"))
     )
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
+@lru_cache(maxsize=1)
 def _logo_data_uri() -> str:
-    try:
-        if _LOGO.is_file():
-            encoded = base64.b64encode(_LOGO.read_bytes()).decode("ascii")
-            suffix = _LOGO.suffix.lower()
-            mime = "image/png" if suffix == ".png" else "image/jpeg"
-            return f"data:{mime};base64,{encoded}"
-    except OSError:
-        pass
+    """Logo as a data URI (no media-file round trip, so it is there on the very first render); "" if missing."""
+    for candidate in (_LOGO, _LOGO.with_suffix(".png")):
+        try:
+            if candidate.is_file():
+                encoded = base64.b64encode(candidate.read_bytes()).decode("ascii")
+                mime = "image/png" if candidate.suffix.lower() == ".png" else "image/jpeg"
+                return f"data:{mime};base64,{encoded}"
+        except OSError:
+            continue
     return ""
 
 
 @st.dialog("inambiente S.r.l. · Identità Aziendale", width="large")
 def show_company_identity_modal() -> None:
-    """High-resolution company identity and branding modal."""
-    if _LOGO.is_file():
-        st.image(str(_LOGO), use_container_width=True)
+    """Company identity modal: logo centred at a controlled width, then the product blurb."""
+    uri = _logo_data_uri()
+    logo_html = f"<img class='identity-logo' src='{uri}' alt='inambiente S.r.l. - logo e dati aziendali'>" if uri else ""
     st.markdown(
-        """
-        <div style="text-align:center; padding:0.8rem 0 0.5rem 0;">
-            <h2 style="margin:0; color:#1F3424; font-weight:800; letter-spacing:-0.02em;">inambiente S.r.l.</h2>
-            <div style="color:#4F7F1E; font-weight:700; letter-spacing:0.08em; font-size:0.86rem; text-transform:uppercase; margin:6px 0 14px 0;">
-                Document Intelligence · Sustainability · Compliance
-            </div>
-            <p style="color:#556658; font-size:0.95rem; line-height:1.6; max-width:640px; margin:0 auto;">
-                Piattaforma avanzata per l'analisi documentale multimodale, audit di conformità ISO 14001,
-                gestione dei consumi energetici, monitoraggio scadenze e generazione di report e fascicoli gestionali.
-            </p>
-        </div>
-        """,
+        "<div class='identity-modal'>"
+        f"{logo_html}"
+        "<div class='identity-copy'>"
+        "<h2>inambiente S.r.l.</h2>"
+        "<div class='identity-tag'>Document Intelligence · Sustainability · Compliance</div>"
+        "<p>Piattaforma avanzata per l'analisi documentale multimodale, audit di conformità ISO 14001, "
+        "gestione dei consumi energetici, monitoraggio scadenze e generazione di report e fascicoli gestionali.</p>"
+        "</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -746,7 +875,7 @@ def sidebar_label(text: str) -> None:
 
 
 def render_sidebar_stats(n_docs: int, n_chunks: int) -> None:
-    st.markdown(f"<div class='tenant-mini'><span class='tenant-dot'></span><div><b>{int(n_docs)} documenti attivi</b><small>Archivio documentale</small></div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='tenant-mini'><span class='tenant-badge'></span><div><b>{int(n_docs)} documenti attivi</b><small>Archivio documentale</small></div></div>", unsafe_allow_html=True)
 
 
 def danger_zone_marker() -> None:

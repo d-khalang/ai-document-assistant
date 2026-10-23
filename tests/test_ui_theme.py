@@ -86,4 +86,27 @@ def test_operational_buttons_styled_in_css(captured):
     assert "min-height:3.2rem" in css
 
 
+@pytest.mark.offline
+def test_css_resolves_nav_icons_dropzone_art_and_tenant_badge(captured):
+    theme.inject_custom_css()
+    css = captured[0]
+    for placeholder in ("__NAV_ICON_RULES__", "__UPLOAD_ART__", "__TENANT_ICON"):
+        assert placeholder not in css
+    for i in range(1, len(theme._NAV_ICON_PATHS) + 1):
+        assert f":nth-child({i})" in css                     # one icon rule per navigation card
+    assert 'content:"Sfoglia file"' in css                 # native "Browse files" is replaced, not appended to
+    assert "tenant-badge" in css and "tenant-dot" not in css
+
+
+@pytest.mark.offline
+def test_identity_modal_logo_is_inlined_and_cached(captured, monkeypatch):
+    theme._logo_data_uri.cache_clear()
+    uri = theme._logo_data_uri()
+    assert uri.startswith("data:image/jpeg;base64,")
+    assert theme._logo_data_uri() is uri                     # read from disk once
+
+    monkeypatch.setattr(theme, "_LOGO", theme._ASSETS / "does-not-exist.jpg")
+    theme._logo_data_uri.cache_clear()
+    assert theme._logo_data_uri() == ""                      # missing file degrades to text-only, no exception
+    theme._logo_data_uri.cache_clear()
 
