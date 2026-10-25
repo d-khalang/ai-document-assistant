@@ -16,6 +16,7 @@ Design rules (fixes vs v1):
 """
 import io
 import json
+import math
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -44,6 +45,16 @@ ADDRESS_KEYS = ("sede_indirizzo",)
 
 GREEN = "1E4D2B"
 DATE_FMT = "DD/MM/YYYY"
+
+# Readability: sizes in points, row heights in points. Data rows never go below ROW_HEIGHT; wrapped text grows them.
+FONT_DATA = 10
+FONT_HEADER = 11
+FONT_KPI_LABEL = 10
+FONT_KPI_VALUE = 18
+ROW_HEIGHT = 26
+HEADER_HEIGHT = 34
+LINE_HEIGHT = 14
+COL_MIN_WIDTH, COL_MAX_WIDTH, COL_PADDING = 16, 60, 6
 STATUS_COLOR = {"Scaduto": "C62828", "In scadenza": "EF6C00", "Valido": "2E7D32"}
 
 
@@ -153,6 +164,16 @@ def _filter_payload(payload: Dict[str, Any], active: set) -> Dict[str, Dict[str,
     return out
 
 
+def _cell_alignment(value: Any, align: Optional[Alignment]) -> Alignment:
+    """Every cell is vertically centred; text wraps; dates and numbers are centred. An explicit `align` wins field by field."""
+    is_text = isinstance(value, str)
+    centred = isinstance(value, (date, datetime, int, float)) and not isinstance(value, bool)
+    horizontal = align.horizontal if align and align.horizontal else ("center" if centred else None)
+    vertical = align.vertical if align and align.vertical else "center"
+    wrap = align.wrap_text if align and align.wrap_text is not None else is_text
+    return Alignment(horizontal=horizontal, vertical=vertical, wrap_text=wrap)
+
+
 def _put(ws, row: int, col: int, value: Any, font: Optional[Font] = None,
          align: Optional[Alignment] = None, border: Optional[Border] = None, fill=None):
     """Safe cell writer: dates get a real date format, '=...' text is never a formula."""
@@ -164,11 +185,9 @@ def _put(ws, row: int, col: int, value: Any, font: Optional[Font] = None,
         cell.value = value
     if isinstance(value, (date, datetime)):
         cell.number_format = DATE_FMT
-        cell.alignment = Alignment(horizontal="center")
     if font:
         cell.font = font
-    if align:
-        cell.alignment = align
+    cell.alignment = _cell_alignment(value, align)
     if border:
         cell.border = border
     if fill:
@@ -179,8 +198,9 @@ def _put(ws, row: int, col: int, value: Any, font: Optional[Font] = None,
 def _header(ws, headers: List[str], row: int = 1) -> None:
     fill = PatternFill(start_color=GREEN, end_color=GREEN, fill_type="solid")
     for c, h in enumerate(headers, start=1):
-        _put(ws, row, c, h, _font(size=10, bold=True, color="FFFFFF"),
+        _put(ws, row, c, h, _font(size=FONT_HEADER, bold=True, color="FFFFFF"),
              Alignment(horizontal="center", vertical="center", wrap_text=True), fill=fill)
+    ws.row_dimensions[row].height = HEADER_HEIGHT
 
 
 def _unique_title(wb, base: str) -> str:
@@ -196,11 +216,28 @@ def _unique_title(wb, base: str) -> str:
         i += 1
 
 
+def _longest_line(value: Any) -> int:
+    return max((len(part) for part in str(value).split(chr(10))), default=0)
+
+
 def _autosize(ws, skip_rows: int = 0) -> None:
+    """Column width from the longest line of each column (plus padding); very long text wraps instead of widening."""
     for col in ws.columns:
         letter = get_column_letter(col[0].column)
-        longest = max((len(str(c.value)) if c.value is not None and c.row > skip_rows else 0) for c in col)
-        ws.column_dimensions[letter].width = min(max(longest + 4, 14), 55)
+        longest = max((_longest_line(c.value) if c.value is not None and c.row > skip_rows else 0) for c in col)
+        ws.column_dimensions[letter].width = min(max(longest + COL_PADDING, COL_MIN_WIDTH), COL_MAX_WIDTH)
+
+
+def _fit_row_heights(ws, first_row: int = 2) -> None:
+    """Data rows get at least ROW_HEIGHT; rows with wrapped text grow to the number of lines it needs (call after _autosize)."""
+    for row in ws.iter_rows(min_row=first_row):
+        lines = 1
+        for cell in row:
+            if isinstance(cell.value, str) and cell.alignment.wrap_text:
+                width = ws.column_dimensions[get_column_letter(cell.column)].width or COL_MIN_WIDTH
+                per_line = max(1, int(width) - 2)
+                lines = max(lines, sum(max(1, math.ceil(len(part) / per_line)) for part in cell.value.split(chr(10))))
+        ws.row_dimensions[row[0].row].height = min(409, max(ROW_HEIGHT, lines * LINE_HEIGHT + 8))
 
 
 def _autofilter(ws) -> None:
@@ -391,13 +428,13 @@ def create_platform_excel_report(
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     border = _border()
-    data_font = _font(size=9)
-    meta_font = _font(size=9, italic=True, color="555555")
+    data_font = _font(size=FONT_DATA)
+    meta_font = _font(size=FONT_DATA, italic=True, color="555555")
 
     # ======================================================= Sheet 1: Dashboard
     ws1 = wb.create_sheet("Dashboard & KPI")
     _put(ws1, 1, 1, f"DASHBOARD DOCUMENTALE & CONFORMITÀ — {comp_name.upper()}",
-         _font(size=14, bold=True, color=GREEN))
+         _font(size=16, bold=True, color=GREEN))
     _put(ws1, 2, 1, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} | Sede Operativa: {comp_address}",
          meta_font)
 
@@ -405,9 +442,11 @@ def create_platform_excel_report(
 
     def kpi_block(row: int, items: List[Tuple[str, Any]]) -> None:
         for c, (label, val) in enumerate(items, start=1):
-            _put(ws1, row, c, label, _font(size=9, bold=True, color="555555"), Alignment(horizontal="center"))
-            _put(ws1, row + 1, c, val, _font(size=16, bold=True, color=GREEN),
+            _put(ws1, row, c, label, _font(size=FONT_KPI_LABEL, bold=True, color="555555"), Alignment(horizontal="center"))
+            _put(ws1, row + 1, c, val, _font(size=FONT_KPI_VALUE, bold=True, color=GREEN),
                  Alignment(horizontal="center"), border, kpi_fill)
+        ws1.row_dimensions[row].height = 24
+        ws1.row_dimensions[row + 1].height = 38
 
     kpi_block(4, [("Totale Documenti", total), ("Documenti Validi", valid),
                   ("In Scadenza (≤ 30 gg)", expiring), ("Scaduti", expired),
@@ -416,7 +455,7 @@ def create_platform_excel_report(
                   ("Scadenze Monitorate", len(deadlines)), ("Scadenze Scadute", dl_overdue),
                   ("Scadenze ≤ 30 gg", dl_30)])
 
-    _put(ws1, 10, 1, "Dettaglio per Categoria:", _font(size=11, bold=True))
+    _put(ws1, 10, 1, "Dettaglio per Categoria:", _font(size=12, bold=True))
     _header(ws1, ["Categoria", "Documenti", "Record Estratti", "Scaduti", "In Scadenza"], row=11)
     cat_stats: Dict[str, Dict[str, int]] = {}
     for r in doc_rows:
@@ -450,9 +489,9 @@ def create_platform_excel_report(
         for c, v in enumerate(values, start=1):
             _put(ws2, r_i, c, v, data_font, border=border)
         for c in (1, 9, 10, 11):
-            ws2.cell(row=r_i, column=c).alignment = Alignment(horizontal="center")
+            ws2.cell(row=r_i, column=c).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         ws2.cell(row=r_i, column=11).font = _font(
-            size=9, bold=d["status"] in STATUS_COLOR, color=STATUS_COLOR.get(d["status"], "555555"))
+            size=FONT_DATA, bold=d["status"] in STATUS_COLOR, color=STATUS_COLOR.get(d["status"], "555555"))
     _autofilter(ws2)
 
     # ======================================================= Sheet 3: Scadenze & Azioni
@@ -476,8 +515,8 @@ def create_platform_excel_report(
         for c, v in enumerate(values, start=1):
             _put(ws3, r3, c, v, data_font, border=border)
         for c in (3, 4, 5, 7, 8):
-            ws3.cell(row=r3, column=c).alignment = Alignment(horizontal="center")
-        ws3.cell(row=r3, column=8).font = _font(size=9, bold=True, color=STATUS_COLOR.get(status, "2E7D32"))
+            ws3.cell(row=r3, column=c).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws3.cell(row=r3, column=8).font = _font(size=FONT_DATA, bold=True, color=STATUS_COLOR.get(status, "2E7D32"))
         r3 += 1
     if r3 == 2:
         _put(ws3, 2, 1, "Nessuna scadenza rilevata nei record estratti.", meta_font)
@@ -526,7 +565,7 @@ def create_platform_excel_report(
                     _put(ws, r_i, c, rec.get("source_document") or "-", data_font, border=border)
                     c += 1
                     _put(ws, r_i, c, f"Pagina {rec.get('source_page') or '-'}",
-                         _font(size=9, italic=True, color="555555"), Alignment(horizontal="center"), border)
+                         _font(size=FONT_DATA, italic=True, color="555555"), Alignment(horizontal="center"), border)
                     for fname, _ in plan:
                         c += 1
                         fd = fields.get(fname) or {}
@@ -534,7 +573,9 @@ def create_platform_excel_report(
                         fill = calc_fill if st == "CALCULATED" else edit_fill if st == "EDITED" else                             unc_fill if st == "UNCERTAIN" else None
                         if variant is not None and (fname == expand["code_field"] or fname in keyed):
                             val = variant.get(fname)
-                            _put(ws, r_i, c, val if val not in (None, "") else "-", data_font, border=border, fill=fill)
+                            # codes, quantities and operations are short tokens: centred
+                            _put(ws, r_i, c, val if val not in (None, "") else "-", data_font,
+                                 Alignment(horizontal="center"), border, fill)
                             if fname in keyed and keyed[fname].get("unit_label"):
                                 c += 1
                                 unit = variant.get(unit_key(fname))
@@ -550,6 +591,7 @@ def create_platform_excel_report(
                     r_i += 1
             _autofilter(ws)
             _autosize(ws)
+            _fit_row_heights(ws)
 
     if not any_analytic:
         ws_e = wb.create_sheet("Dati Estratti (Analitici)")
@@ -557,6 +599,9 @@ def create_platform_excel_report(
 
     for ws_item in (ws2, ws3):
         _autosize(ws_item)
+        _fit_row_heights(ws_item)
+    for r in range(12, ws1.max_row + 1):
+        ws1.row_dimensions[r].height = ROW_HEIGHT
     for letter, w in zip("ABCDE", (34, 22, 22, 22, 22)):
         ws1.column_dimensions[letter].width = w
 
