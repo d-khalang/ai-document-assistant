@@ -1,5 +1,6 @@
 """Schema Registry: loads modules/schemas from schemas/*.json (no domain logic in code)."""
 import json
+import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -90,6 +91,14 @@ class SchemaDef:
         return self.layout.get("word_sections") or []
 
     @property
+    def hide_status_column(self) -> bool:
+        return bool(self.layout.get("hide_status_column"))
+
+    @property
+    def excel_expand(self) -> Dict[str, Any]:
+        return self.layout.get("excel_expand") or {}
+
+    @property
     def required(self) -> List[str]:
         return [f.name for f in self.fields.values() if f.required]
 
@@ -168,6 +177,26 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
     for sec in layout.get("word_sections", []):
         if sec.get("field") not in fields or sec.get("style") not in ("table", "list"):
             raise ValueError(f"{src}: {name}.layout.word_sections invalid: {sec}")
+
+    if not isinstance(layout.get("hide_status_column", False), bool):
+        raise ValueError(f"{src}: {name}.layout.hide_status_column must be a boolean")
+    expand = layout.get("excel_expand")
+    if expand is not None:
+        if expand.get("code_field") not in fields:
+            raise ValueError(f"{src}: {name}.layout.excel_expand.code_field must be an existing field")
+        try:
+            re.compile(expand.get("code_pattern") or "")
+        except (re.error, TypeError):
+            raise ValueError(f"{src}: {name}.layout.excel_expand.code_pattern must be a valid regex")
+        if not expand.get("code_pattern"):
+            raise ValueError(f"{src}: {name}.layout.excel_expand.code_pattern is required")
+        keyed = expand.get("keyed_fields") or {}
+        for kname, kconf in keyed.items():
+            if kname not in fields or kname == expand["code_field"]:
+                raise ValueError(f"{src}: {name}.layout.excel_expand.keyed_fields unknown field '{kname}'")
+            unit_label = (kconf or {}).get("unit_label")
+            if unit_label is not None and not (isinstance(unit_label, str) and unit_label.strip()):
+                raise ValueError(f"{src}: {name}.layout.excel_expand.keyed_fields.{kname}.unit_label invalid")
 
     guidelines = (raw.get("chat") or {}).get("guidelines") or []
     if not isinstance(guidelines, list) or not all(isinstance(g, str) and g.strip() for g in guidelines):

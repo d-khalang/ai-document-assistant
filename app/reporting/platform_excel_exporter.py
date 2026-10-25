@@ -26,6 +26,7 @@ from openpyxl.utils import get_column_letter
 from app.alerts.deadlines import extract_deadlines_from_records
 from app.extraction.registry import SchemaDef, get_module, resolve_schema
 from app.reporting.common import cell_value, column_plan, sheet_title_for
+from app.reporting.expansion import expand_record, unit_key
 
 OK_STATUSES = ("EXTRACTED", "EDITED", "CALCULATED")
 MANUAL_SOURCES = ("", "manual", None)
@@ -38,6 +39,8 @@ SUBJECT_KEYS = (
 ISSUER_KEYS = ("ente_formatore", "ente_emittente", "ente_rilascio", "fornitore", "fornitore_tecnico")
 ISSUE_DATE_KEYS = ("data_emissione", "data_rilascio", "data_intervento", "data_rifornimento")
 RESPONSIBLE_KEYS = ("responsabile",)
+COMPANY_KEYS = ("ragione_sociale",)
+ADDRESS_KEYS = ("sede_indirizzo",)
 
 GREEN = "1E4D2B"
 DATE_FMT = "DD/MM/YYYY"
@@ -258,7 +261,7 @@ def _next_notice(due: date, thresholds: Any, today: date) -> Optional[date]:
 
 # ----------------------------------------------------------------------------- per-document metadata
 def _doc_meta(entries: List[Tuple[str, str, Dict[str, Any]]]) -> Dict[str, Any]:
-    subjects, issuers, resps, issue_dates, due_dates = [], [], [], [], []
+    subjects, issuers, resps, companies, addresses, issue_dates, due_dates = [], [], [], [], [], [], []
     cat_counts: Dict[str, int] = {}
     mods: List[str] = []
     n_edit = n_warn = 0
@@ -272,7 +275,8 @@ def _doc_meta(entries: List[Tuple[str, str, Dict[str, Any]]]) -> Dict[str, Any]:
         if short not in mods:
             mods.append(short)
 
-        for keys, bucket in ((SUBJECT_KEYS, subjects), (ISSUER_KEYS, issuers), (RESPONSIBLE_KEYS, resps)):
+        for keys, bucket in ((SUBJECT_KEYS, subjects), (ISSUER_KEYS, issuers), (RESPONSIBLE_KEYS, resps),
+                             (COMPANY_KEYS, companies), (ADDRESS_KEYS, addresses)):
             for k in keys:
                 t = _text(fields.get(k))
                 if t:
@@ -297,6 +301,8 @@ def _doc_meta(entries: List[Tuple[str, str, Dict[str, Any]]]) -> Dict[str, Any]:
         "subject": _distinct(subjects),
         "issuer": _distinct(issuers),
         "responsabile": _distinct(resps),
+        "company": _distinct(companies),
+        "address": _distinct(addresses),
         "issue": min(issue_dates) if issue_dates else None,
         "due": min(due_dates) if due_dates else None,   # earliest = worst case for the document
         "cat_counts": cat_counts,
@@ -314,12 +320,14 @@ def create_platform_excel_report(
     deadlines: Optional[List[Dict[str, Any]]] = None,
     company_profile: Optional[Dict[str, Any]] = None,
     routing: Optional[Dict[str, str]] = None,
-    errors: Optional[Dict[str, str]] = None,
+    errors: Optional[Dict[str, str]] = None,  # kept for API compatibility; the register no longer has a Note column
 ) -> bytes:
     today = date.today()
     comp = company_profile or {}
-    comp_name = (comp.get("company_name") or "").strip() or "AZIENDA"
-    comp_address = (comp.get("address") or "").strip() or "-"
+    profile_name = (comp.get("company_name") or "").strip()
+    profile_address = (comp.get("address") or "").strip()
+    comp_name = profile_name or "AZIENDA"
+    comp_address = profile_address or "-"
     director = (comp.get("technical_director") or "").strip()
 
     names: List[str] = []
@@ -348,33 +356,25 @@ def create_platform_excel_report(
         if entries:
             m = _doc_meta(entries)
             status, days = _calc_doc_status(m["due"], today)
-            parts = [f"{m['n_records']} record estratti"]
-            if m["n_edit"]:
-                parts.append("rivisti manualmente")
-            if m["n_warn"]:
-                parts.append(f"{m['n_warn']} record da verificare")
             doc_rows.append({
                 "idx": idx, "filename": name,
+                # company / address: what the document itself says first, the tenant profile only as fallback
+                "company": m["company"] if m["company"] != "-" else (profile_name or "-"),
+                "address": m["address"] if m["address"] != "-" else (profile_address or "-"),
                 "category": ", ".join(m["cat_counts"]), "project": ", ".join(m["modules"]),
                 "subject": m["subject"], "issuer": m["issuer"],
                 "issue": m["issue"], "due": m["due"], "status": status, "days": days,
                 "resp": m["responsabile"] if m["responsabile"] != "-" else (director or "-"),
-                "note": " · ".join(parts), "cat_counts": m["cat_counts"],
+                "cat_counts": m["cat_counts"],
             })
         else:
-            err = (errors or {}).get(name)
             routed = (routing or {}).get(name)
-            if err:
-                note = f"Estrazione fallita — {err[:200]}"
-            elif routed:
-                note = f"Estrazione eseguita: nessun record riconosciuto ({routed})"
-            else:
-                note = "Non analizzato — eseguire l'analisi automatica"
             doc_rows.append({
                 "idx": idx, "filename": name, "category": routed or "Non classificato", "project": "-",
+                "company": profile_name or "-", "address": profile_address or "-",
                 "subject": "-", "issuer": "-", "issue": None, "due": None,
                 "status": "Non analizzato", "days": None, "resp": director or "-",
-                "note": note, "cat_counts": {},
+                "cat_counts": {},
             })
 
     count = lambda s: sum(1 for r in doc_rows if r["status"] == s)  # noqa: E731
@@ -440,13 +440,13 @@ def create_platform_excel_report(
     reg_headers = [
         "ID Documento", "Azienda / Cliente", "Sede", "Progetto", "Categoria",
         "Titolo / Nome File", "Dipendente / Macchina / Asset", "Fornitore / Ente Emittente",
-        "Data Emissione", "Data Scadenza", "Stato", "Responsabile", "Note",
+        "Data Emissione", "Data Scadenza", "Stato", "Responsabile",
     ]
     _header(ws2, reg_headers)
     for r_i, d in enumerate(doc_rows, start=2):
-        values = [f"DOC-{d['idx']:03d}", comp_name, comp_address, d["project"], d["category"],
+        values = [f"DOC-{d['idx']:03d}", d["company"], d["address"], d["project"], d["category"],
                   d["filename"], d["subject"], d["issuer"], d["issue"] or "-", d["due"] or "-",
-                  d["status"], d["resp"], d["note"]]
+                  d["status"], d["resp"]]
         for c, v in enumerate(values, start=1):
             _put(ws2, r_i, c, v, data_font, border=border)
         for c in (1, 9, 10, 11):
@@ -502,25 +502,52 @@ def create_platform_excel_report(
             ws = wb.create_sheet(_unique_title(wb, sheet_title_for(schema, sname, fallback)))
             ws.freeze_panes = "A2"
             plan = column_plan(sname, mod_obj, records)
-            _header(ws, ["Documento Fonte", "Pagina Fonte"] + [c[1] for c in plan] + ["Stato"])
+            expand = schema.excel_expand if schema else {}
+            keyed = expand.get("keyed_fields") or {}
+            with_status = not (schema and schema.hide_status_column)
 
-            for r_i, rec in enumerate(records, start=2):
-                _put(ws, r_i, 1, rec.get("source_document") or "-", data_font, border=border)
-                _put(ws, r_i, 2, f"Pagina {rec.get('source_page') or '-'}", _font(size=9, italic=True, color="555555"),
-                     Alignment(horizontal="center"), border)
+            # Column layout: one header per plan field; per-code fields that declare a unit get a unit column right after.
+            headers = ["Documento Fonte", "Pagina Fonte"]
+            for fname, flabel in plan:
+                headers.append(flabel)
+                if fname in keyed and keyed[fname].get("unit_label"):
+                    headers.append(keyed[fname]["unit_label"])
+            if with_status:
+                headers.append("Stato")
+            _header(ws, headers)
+
+            r_i = 2
+            for rec in records:
                 fields = rec.get("fields") or {}
-                for c, (fname, _) in enumerate(plan, start=3):
-                    fd = fields.get(fname) or {}
-                    val = cell_value(fd)
-                    if ftypes.get(fname) == "date" and _to_date(val):
-                        val = _to_date(val)
-                    st = fd.get("status")
-                    fill = calc_fill if st == "CALCULATED" else edit_fill if st == "EDITED" else \
-                        unc_fill if st == "UNCERTAIN" else None
-                    align = Alignment(wrap_text=True, vertical="top") if fname in long_fields else None
-                    _put(ws, r_i, c, val if val is not None else "-", data_font, align=align, border=border, fill=fill)
-                _put(ws, r_i, len(plan) + 3, _record_status(rec), data_font,
-                     Alignment(horizontal="center"), border)
+                # one report row per code when the schema asks for it, else exactly one row for the record
+                variants = expand_record({n: _text(fields.get(n)) for n in [expand["code_field"], *keyed]}, expand)                     if expand else [None]
+                for variant in variants:
+                    c = 1
+                    _put(ws, r_i, c, rec.get("source_document") or "-", data_font, border=border)
+                    c += 1
+                    _put(ws, r_i, c, f"Pagina {rec.get('source_page') or '-'}",
+                         _font(size=9, italic=True, color="555555"), Alignment(horizontal="center"), border)
+                    for fname, _ in plan:
+                        c += 1
+                        fd = fields.get(fname) or {}
+                        st = fd.get("status")
+                        fill = calc_fill if st == "CALCULATED" else edit_fill if st == "EDITED" else                             unc_fill if st == "UNCERTAIN" else None
+                        if variant is not None and (fname == expand["code_field"] or fname in keyed):
+                            val = variant.get(fname)
+                            _put(ws, r_i, c, val if val not in (None, "") else "-", data_font, border=border, fill=fill)
+                            if fname in keyed and keyed[fname].get("unit_label"):
+                                c += 1
+                                unit = variant.get(unit_key(fname))
+                                _put(ws, r_i, c, unit or "-", data_font, Alignment(horizontal="center"), border, fill)
+                            continue
+                        val = cell_value(fd)
+                        if ftypes.get(fname) == "date" and _to_date(val):
+                            val = _to_date(val)
+                        align = Alignment(wrap_text=True, vertical="top") if fname in long_fields else None
+                        _put(ws, r_i, c, val if val is not None else "-", data_font, align=align, border=border, fill=fill)
+                    if with_status:
+                        _put(ws, r_i, c + 1, _record_status(rec), data_font, Alignment(horizontal="center"), border)
+                    r_i += 1
             _autofilter(ws)
             _autosize(ws)
 

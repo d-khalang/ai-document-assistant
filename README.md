@@ -97,7 +97,7 @@ Domain logic resides entirely in external JSON files (`schemas/*.json`):
 | **Vector Store** | ChromaDB | Persistent local vector store configured with Cosine similarity |
 | **Relational Database** | SQLite (`sqlite3`) | Users, conversations, company tenant profiles, deadlines, and alert logs (WAL mode) |
 | **Document Parsers** | `pypdf`, `pymupdf`, `python-docx`, `pandas`, `openpyxl`, `Pillow` | Robust multimodal and spreadsheet ingestors |
-| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (49/49 passing) |
+| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (65/65 passing) |
 
 ---
 

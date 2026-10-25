@@ -61,6 +61,8 @@
           "keywords": ["fornitore", "acqua", "gas", "fasce", "f1", "f2", "f3", "periodo fatturato", "energia elettrica"]
         },
       "fields": {
+        "ragione_sociale": {"type": "string", "label": "Azienda / Ragione Sociale", "description": "COMPLETE legal name of the company the document refers to (Ragione Sociale), exactly as written and INCLUDING the legal form (e.g. \"ALPHA S.R.L.\", \"BETA S.p.A.\", \"GAMMA S.N.C.\"). Never cut it to the first word and never add the address. null if absent."},
+        "sede_indirizzo": {"type": "string", "label": "Sede / Indirizzo", "description": "COMPLETE address of the supply point / customer site (sede legale, sede operativa or ubicazione impianto): street, number, municipality and province as written, e.g. \"VIA ROMA, 100 - BORGARO (TO)\". null if absent."},
         "tipo_utenza": {"type": "string", "label": "Tipo Utenza", "required": true, "description": "Elettricità, Acqua, Gas"},
         "fornitore": {"type": "string", "label": "Fornitore / Gestore", "description": "Ragione sociale fornitore"},
         "codice_pod_pdr": {"type": "string", "label": "Codice POD / PDR / Matricola", "description": "POD, PDR o Matricola contatore"},
@@ -100,6 +102,8 @@
         }
       },
       "fields": {
+        "ragione_sociale": {"type": "string", "label": "Azienda / Ragione Sociale", "description": "COMPLETE legal name of the employer company named in the document (Ragione Sociale), exactly as written and INCLUDING the legal form (e.g. \"ALPHA S.R.L.\", \"BETA S.p.A.\", \"GAMMA S.N.C.\"). Never cut it to the first word and never add the address. null if absent."},
+        "sede_indirizzo": {"type": "string", "label": "Sede / Indirizzo", "description": "COMPLETE address of the company or site the document refers to (sede legale, sede operativa or ubicazione impianto): street, number, municipality and province as written, e.g. \"VIA ROMA, 100 - BORGARO (TO)\". null if absent."},
         "nominativo_dipendente": {"type": "string", "label": "Dipendente / Collaboratore", "required": true, "description": "Nome e cognome lavoratore"},
         "codice_fiscale": {"type": "string", "label": "Codice Fiscale", "description": "Codice Fiscale lavoratore"},
         "corso_descrizione": {"type": "string", "label": "Titolo Corso / Abilitazione", "required": true, "description": "Titolo completo del corso o abilitazione copiato testualmente dal documento (es. Corso Carrellisti, Aggiornamento Preposti, Primo Soccorso)"},
@@ -123,6 +127,16 @@
         },
       "layout": {
         "sheet_title": "Dettagli File",
+        "hide_status_column": true,
+        "excel_expand": {
+          "code_field": "elenco_codici_eer",
+          "code_pattern": "(?<![\\d.])(?:\\d{2}[. ]\\d{2}[. ]\\d{2}|\\d{6})\\*?(?!\\d)",
+          "keyed_fields": {
+            "quantitativi_movimentabili": {"unit_label": "U. di misura"},
+            "quantitativi_deposito": {"unit_label": "U. di misura"},
+            "operazioni_trattamento": {}
+          }
+        },
         "report_title": "RAPPORTO DI AUTORIZZAZIONE E PRESCRIZIONI AMBIENTALI",
         "word_header_fields": [
           "numero_atto_protocollo",
@@ -144,6 +158,8 @@
         ]
       },
       "fields": {
+        "ragione_sociale": {"type": "string", "label": "Azienda / Ragione Sociale", "description": "COMPLETE legal name of the company the document refers to (Ragione Sociale), exactly as written and INCLUDING the legal form (e.g. \"ALPHA S.R.L.\", \"BETA S.p.A.\", \"GAMMA S.N.C.\"). Never cut it to the first word and never add the address. null if absent."},
+        "sede_indirizzo": {"type": "string", "label": "Sede / Indirizzo", "description": "COMPLETE address of the company or site the document refers to (sede legale, sede operativa or ubicazione impianto): street, number, municipality and province as written, e.g. \"VIA ROMA, 100 - BORGARO (TO)\". null if absent."},
         "numero_atto_protocollo": {"type": "string", "label": "N. Atto / Protocollo", "required": true, "description": "Numero identificativo autorizzazione"},
         "numero_iscrizione": {"type": "string", "label": "N. Iscrizione Albo / Registro", "description": "Numero iscrizione Albo es. TO15878"},
         "ente_rilascio": {"type": "string", "label": "Ente Rilascio", "required": true, "description": "Provincia, Regione, Albo Gestori"},
@@ -151,9 +167,10 @@
         "data_scadenza": {"type": "date", "label": "Data Scadenza Atto", "description": "Termine di validità dell'atto", "alert": {"thresholds_days": [180, 90, 30], "label_fields": ["numero_atto_protocollo", "ente_rilascio"]}},
         "attivita_autorizzate": {"type": "string", "label": "Attività e Categorie Autorizzate", "description": "Operazioni autorizzate: es. Categoria 4-E, R13, R4"},
         "mezzi_autorizzati": {"type": "string", "label": "Mezzi e Targhe Autorizzati", "description": "Targhe e tipologia mezzi autorizzati"},
-        "elenco_codici_eer": {"type": "string", "label": "Codici EER / Rifiuti Ammessi", "description": "Complete consolidated list of all authorized Codici EER / CER across all pages and tables (e.g. Sezione 1 and Sezione 1-bis), comma-separated, without omitting any code."},
-        "quantitativi_movimentabili": {"type": "string", "label": "Quantitativi autorizzati movimentabili", "description": "Maximum authorized ANNUAL throughput of waste (t/a) consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). Copy verbatim with unit. If the document distinguishes Fase 1 / Fase 2 or per EER code/operation, report each as 'Fase 1: X t/a; Fase 2: Y t/a'. Never sum, convert or infer. null if absent."},
-        "quantitativi_deposito": {"type": "string", "label": "Quantitativi autorizzati in deposito", "description": "Maximum SIMULTANEOUS storage capacity on site (t) (messa in riserva/stoccaggio istantaneo) consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). Verbatim with unit, keep Fase 1 / Fase 2 split if present. Do NOT confuse with annual throughput. null if absent."},
+        "elenco_codici_eer": {"type": "string", "label": "Codici EER / Rifiuti Ammessi", "description": "Complete consolidated list of all authorized Codici EER / CER across all pages and tables (e.g. Sezione 1 and Sezione 1-bis), comma-separated, WITHOUT omitting any code and without descriptions. Write each code as NN.NN.NN, adding * for hazardous codes (e.g. 16.01.03, 16.01.04*)."},
+        "quantitativi_movimentabili": {"type": "string", "label": "Quantitativi autorizzati movimentabili", "description": "Maximum authorized ANNUAL throughput of waste, consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). ONE entry per EER code, one per line, in the form \"<EER code>: <number> <unit>\" with number and unit copied verbatim (e.g. \"16.01.03: 9 t/a\"). Only if the document gives a global or per-phase figure that is NOT split by code, write it as \"Fase 1: X t/a; Fase 2: Y t/a\" without a code. Never sum, convert or infer. null if absent."},
+        "quantitativi_deposito": {"type": "string", "label": "Quantitativi autorizzati in deposito", "description": "Maximum SIMULTANEOUS storage capacity on site (messa in riserva/stoccaggio istantaneo), consolidated across all sections/tables (e.g. Sezione 1 / 1-bis). ONE entry per EER code, one per line, in the form \"<EER code>: <number> <unit>\" with number and unit copied verbatim (e.g. \"16.01.03: 4 t\"). Only if the document gives a global or per-phase figure that is NOT split by code, write it as \"Fase 1: X t\" without a code. Do NOT confuse with annual throughput. null if absent."},
+        "operazioni_trattamento": {"type": "string", "label": "Operazioni di trattamento", "description": "Recovery/disposal operations authorized for each EER code (R13, R12, R4, D15...). ONE entry per EER code, one per line, in the form \"<EER code>: <operation codes>\" (e.g. \"16.01.03: R13\"), consolidated across all sections/tables. If the operations are not split by code, write them once without a code. null if absent."},
         "responsabili_tecnici_note": {"type": "string", "label": "Responsabile Tecnico / Variazioni", "description": "Nomine o cessazioni incarico"},
         "prescrizioni_rilevanti": {"type": "string", "label": "Prescrizioni / Condizioni Subordinanti", "description": "ONLY financial guarantees and conditions not covered by the two prescription fields below."},
         "prescrizioni_con_scadenza": {"type": "string", "label": "Prescrizioni con scadenza", "description": "All conditions with an explicit deadline/date/period consolidated from the entire document (both main Determina and technical annexes such as Sezione 4). ONE item per line (single string, items separated by newline). Format: '<verbatim text> || <deadline as written>'. null if none."},

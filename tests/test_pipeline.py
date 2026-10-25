@@ -113,5 +113,10 @@ def test_exporter_explains_unanalyzed_documents():
         errors={"bad.pdf": "boom"},
     )
     ws = openpyxl.load_workbook(io.BytesIO(xl))["Registro Documenti"]
-    notes = {ws.cell(r, 6).value: ws.cell(r, 13).value for r in range(2, 5)}
-    assert "nessun record" in notes["empty.pdf"] and "fallita" in notes["bad.pdf"] and "analisi automatica" in notes["new.pdf"]
+    headers = [c.value for c in ws[1]]
+    assert "Note" not in headers                      # the register has no free-text Note column any more
+    col = {h: n for n, h in enumerate(headers, start=1)}
+    rows = {ws.cell(r, col["Titolo / Nome File"]).value: r for r in range(2, 5)}
+    assert {ws.cell(r, col["Stato"]).value for r in rows.values()} == {"Non analizzato"}
+    assert ws.cell(rows["empty.pdf"], col["Categoria"]).value == "Energia › Bollette"
+    assert ws.cell(rows["new.pdf"], col["Categoria"]).value == "Non classificato"
