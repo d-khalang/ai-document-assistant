@@ -261,7 +261,7 @@ CHART_WIDTH_PX = 720
 NUM_FMT = "#,##0.00"
 
 
-def _trend_sheet(wb, analyses: List[ConsumptionAnalysis]) -> None:
+def write_trend_sheet(wb, analyses: List[ConsumptionAnalysis]) -> None:
     """Monthly matrix (months x years, totals, averages, like-for-like YoY) + chart next to it, for every analysed schema."""
     ws = wb.create_sheet(TREND_SHEET)
     border = _border()
@@ -702,7 +702,7 @@ def create_platform_excel_report(
 
     analyses = analyze_payload(payload)          # [] for documents without consumption data -> no sheet, no chart
     if analyses:
-        _trend_sheet(wb, analyses)
+        write_trend_sheet(wb, analyses)
 
     for ws_item in (ws2, ws3):
         _autosize(ws_item)

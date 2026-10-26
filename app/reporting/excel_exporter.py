@@ -5,6 +5,8 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+from app.reporting.analytics import analyze_payload
+from app.reporting.platform_excel_exporter import write_trend_sheet
 from app.reporting.common import (
     resolve_scope,
     report_meta,
@@ -197,6 +199,12 @@ def create_styled_excel_report(
                 if len(val_str) > max_len:
                     max_len = len(val_str)
             ws_item.column_dimensions[col_letter].width = min(max(max_len + 4, 15), 60)
+
+    # Trend & Analisi Consumi: only when the module has consumption/cost records (added after the width pass:
+    # the sheet sizes its own columns around the matrix and the chart)
+    analyses = analyze_payload({module.module_id: scoped_data}) if module else []
+    if analyses:
+        write_trend_sheet(wb, analyses)
 
     output = io.BytesIO()
     wb.save(output)

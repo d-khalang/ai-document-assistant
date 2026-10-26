@@ -18,12 +18,18 @@ SUPPORTED_MONTHS = {
 }
 
 
+_TIME_SUFFIX = re.compile(r"[T\s]+\d{1,2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?$")
+
+
 def normalize_date(raw_date_str: Optional[str]) -> Optional[str]:
     """
     نرمال‌سازی تاریخ‌های گوناگون (ایتالیایی، انگلیسی، اسلش، نقطه و خط فاصله) به فرمت YYYY-MM-DD.
     """
     if not raw_date_str or not isinstance(raw_date_str, str):
         return None
+
+    # timestamps (Excel datetimes, ISO 8601): only the calendar day matters
+    raw_date_str = _TIME_SUFFIX.sub("", raw_date_str.strip())
 
     cleaned = raw_date_str.strip().lower()
     cleaned = re.sub(r"[,\.]", " ", cleaned)

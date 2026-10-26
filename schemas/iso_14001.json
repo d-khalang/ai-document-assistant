@@ -58,8 +58,8 @@
       "label": "Consumi Utenze e Risorse",
       "description": "Monitoraggio consumi energia elettrica, acqua industriale, gas naturale.",
       "routing": {
-          "strong_keywords": ["pod", "pdr", "kwh", "smc", "contatore", "consumi"],
-          "keywords": ["fornitore", "acqua", "gas", "fasce", "f1", "f2", "f3", "periodo fatturato", "energia elettrica"]
+          "strong_keywords": ["pod", "pdr", "kwh", "smc", "contatore", "consumi", "acquedotto", "servizio idrico", "consumi idrici", "h2o", "metri cubi"],
+          "keywords": ["fornitore", "acqua", "gas", "fasce", "f1", "f2", "f3", "periodo fatturato", "energia elettrica", "idric*", "fognatura", "depurazione", "mc", "m3", "acqua potabile"]
         },
       "analytics": {"period_fields": ["periodo_riferimento"], "dimension_field": "tipo_utenza", "dimension_label": "Tipo utenza", "metrics": [{"field": "consumo_totale", "kind": "quantity", "label": "Consumo", "unit_field": "unita_misura"}, {"field": "totale_spesa_eur", "kind": "cost", "label": "Spesa utenze", "unit": "€"}]},
       "fields": {

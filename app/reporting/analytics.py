@@ -13,6 +13,7 @@ Zero-hallucination rules:
   full one.
 - Missing months stay `None` (never 0).
 """
+import calendar
 import math
 import re
 from dataclasses import dataclass
@@ -117,6 +118,11 @@ def _valid(year: int, month: int) -> bool:
     return 1990 <= year <= 2100 and 1 <= month <= 12
 
 
+def _valid_day(year: int, month: int, day: int) -> bool:
+    """A real calendar day: 31/02 is rejected, so an impossible date never lands in a month."""
+    return _valid(year, month) and 1 <= day <= calendar.monthrange(year, month)[1]
+
+
 def _month_of_token(token: str) -> Optional[int]:
     t = token.lower()
     if t in SUPPORTED_MONTHS:
@@ -162,8 +168,8 @@ def _from_words(text: str) -> Optional[Tuple[YearMonth, YearMonth]]:
 def parse_period(value: Any) -> Optional[Tuple[YearMonth, YearMonth]]:
     """
     (start, end) as (year, month) pairs, or None when the text does not name a month with certainty.
-    Accepts dates (ISO, dd/mm/yyyy), ranges of dates, 'YYYY-MM', 'MM/YYYY' and month names with a year
-    ('Settembre 2025', 'Luglio - Agosto 2025').
+    Accepts dates (ISO, dd/mm/yyyy), timestamps ('2025-01-01 00:00:00', '2025-01-01T08:30:00Z', datetime objects),
+    ranges of dates, 'YYYY-MM', 'MM/YYYY' and month names with a year ('Settembre 2025', 'Luglio - Agosto 2025').
     """
     if isinstance(value, datetime):
         value = value.date()
@@ -175,10 +181,10 @@ def parse_period(value: Any) -> Optional[Tuple[YearMonth, YearMonth]]:
 
     points: List[YearMonth] = []
     for d, m, y in _DMY.findall(text):
-        if _valid(int(y), int(m)) and 1 <= int(d) <= 31:
+        if _valid_day(int(y), int(m), int(d)):
             points.append((int(y), int(m)))
     for y, m, d in _YMD.findall(text):
-        if _valid(int(y), int(m)) and 1 <= int(d) <= 31:
+        if _valid_day(int(y), int(m), int(d)):
             points.append((int(y), int(m)))
     if not points:
         points = [(int(y), int(m)) for y, m in _YM.findall(text) if _valid(int(y), int(m))]
@@ -192,6 +198,18 @@ def parse_period(value: Any) -> Optional[Tuple[YearMonth, YearMonth]]:
 # ----------------------------------------------------------------------------- field access
 def _raw(fdata: Any) -> Any:
     if not isinstance(fdata, dict) or fdata.get("status", "EXTRACTED") not in OK_STATUSES:
+        return None
+    v = fdata.get("normalized_value")
+    return v if v is not None else fdata.get("raw_value")
+
+
+def _period_raw(fdata: Any) -> Any:
+    """
+    Value of a period field. Unlike the metric values, a period whose strict date normalization failed (UNCERTAIN, e.g. a
+    timestamp stored before the normalizer learned to strip the time part) is still read from its raw text: only the
+    month is needed and `parse_period` is deterministic and rejects impossible dates, so nothing is guessed.
+    """
+    if not isinstance(fdata, dict) or fdata.get("status") == "MISSING":
         return None
     v = fdata.get("normalized_value")
     return v if v is not None else fdata.get("raw_value")
@@ -277,7 +295,7 @@ def analyze_records(module_id: str, schema: SchemaDef, records: List[Dict[str, A
             continue                                     # nothing to aggregate in this record
         period = None
         for pf in cfg["period_fields"]:
-            period = parse_period(_raw(fields.get(pf)))
+            period = parse_period(_period_raw(fields.get(pf)))
             if period:
                 break
         if period is None:

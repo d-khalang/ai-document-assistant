@@ -9,7 +9,7 @@
 - **Last shipped:** deterministic numeric progress bars (batch indexing, manual extraction, 5-stage platform pipeline; `progress_percent` / `show_pipeline_stage` in `theme.py`); consumption/cost trend analytics (`app/reporting/analytics.py` + `charts.py`, schema-declared `analytics` block; "Trend & Analisi Consumi" Excel sheet and Word section; matplotlib added by explicit request); deterministic `derived_dates` (training-certificate expiry); structured
   extracted-metadata context + provenance rules in Document Chat, now built by the pure function
   `build_chat_structured_context` with domain wording declared in `schemas/*.json → chat.guidelines`.
-- **Baseline health:** `python check_health.py` → 6 modules / 10 schemas / 1 fallback / 113 tests green.
+- **Baseline health:** `python check_health.py` → 6 modules / 10 schemas / 1 fallback / 133 tests green.
 - **UI/UX alignment (inambiente design system) — done:** SVG hero banner + slogan + glass pills, card-style
   sidebar nav with chevrons and module selector, metric cards, styled dropzone (`app/ui/theme.py`).
   Metric cards support an optional `delta` (month-over-month) but it is only shown with a real
