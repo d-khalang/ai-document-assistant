@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from app.ai.gemini import generate_structured_json
 from app.extraction.calculators import compute_value, compute_expiry_date
 from app.extraction.normalizer import normalize_date, normalize_number, normalize_plate
@@ -179,16 +179,25 @@ def extract_structured_data(pages: List[Dict[str, Any]], schema_name: str = "sca
 
 
 def extract_for_documents(pages_by_document: Dict[str, List[Dict[str, Any]]], schema_name: str,
-                          module_id: Optional[str] = None) -> Dict[str, Any]:
-    """One call per document: keeps page numbers unambiguous; one failing file never stops the batch."""
+                          module_id: Optional[str] = None,
+                          on_progress: Optional[Callable[[int, int, str, Optional[str]], None]] = None) -> Dict[str, Any]:
+    """One call per document: keeps page numbers unambiguous; one failing file never stops the batch.
+
+    `on_progress(done, total, document, error_or_None)` (optional) is called after each document, from the calling thread.
+    """
     merged: Dict[str, Any] = {"schema": schema_name, "module_id": module_id, "records": [], "errors": {}}
-    for doc_name, pages in pages_by_document.items():
+    total = len(pages_by_document)
+    for done, (doc_name, pages) in enumerate(pages_by_document.items(), start=1):
+        err: Optional[str] = None
         try:
             res = extract_structured_data(pages, schema_name, module_id, source_document=doc_name)
             merged["module_id"] = res["module_id"]
             merged["records"].extend(res["records"])
         except Exception as e:
-            merged["errors"][doc_name] = str(e)
+            err = str(e)
+            merged["errors"][doc_name] = err
+        if on_progress:
+            on_progress(done, total, doc_name, err)
 
     merged["total_records"] = len(merged["records"])
     return merged

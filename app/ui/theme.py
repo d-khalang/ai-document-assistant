@@ -645,6 +645,29 @@ hr { border-color:var(--border)!important; }
 .loader-shell { padding:1rem; border:1px solid var(--border); border-radius:14px; background:white; }
 .loader-track { height:7px; border-radius:99px; overflow:hidden; background:#E7EDE4; margin-top:.7rem; }
 .loader-fill { width:40%; height:100%; border-radius:99px; background:linear-gradient(90deg,#8CC63F,#C8E86D,#8CC63F); animation:shimmer 1.5s infinite ease-in-out; }
+/* Deterministic progress bars (st.progress): slim, fully rounded, brand-green fill that glides to each new value */
+[data-testid="stProgress"] { padding:.15rem 0 .35rem; }
+[data-testid="stProgress"] p { color:#2D3D30; font-size:.92rem; font-weight:600; margin-bottom:.35rem; }
+[data-testid="stProgress"] [role="progressbar"] {
+ height:10px !important;
+ min-height:10px;
+ border-radius:999px !important;
+ overflow:hidden !important;
+ background:#EBF0E6 !important;
+}
+/* wrapper layers (1 in Streamlit 1.6x, 2 in 1.5x) stay transparent and only clip; the innermost div is the fill */
+[data-testid="stProgress"] [role="progressbar"] div {
+ height:100% !important;
+ border-radius:999px !important;
+ background:transparent !important;
+ overflow:hidden;
+}
+[data-testid="stProgress"] [role="progressbar"] div:not(:has(div)) {
+ background:linear-gradient(90deg,#8CC63F,#7DB531) !important;
+ overflow:visible;
+ transition:transform .35s ease-in-out, width .35s ease-in-out !important;
+}
+[data-testid="stProgress"] + [data-testid="stCaptionContainer"] { margin-top:-.1rem; }
 @keyframes shimmer { 0%{transform:translateX(-110%)} 100%{transform:translateX(280%)} }
 @media(max-width:900px){
  .block-container{padding:4.2rem .8rem 2rem}
@@ -960,6 +983,37 @@ def loader(title: str, subtitle: str = "", variant: str = "orbit") -> Iterator[o
             yield slot
         finally:
             pass
+
+
+def progress_percent(done: float, total: float, start: int = 0, end: int = 100) -> int:
+    """Whole percent (clamped to start..end) of `done` out of `total`, mapped onto the [start, end] band of a bigger bar."""
+    if total <= 0:
+        return start
+    frac = min(1.0, max(0.0, done / total))
+    return int(round(start + (end - start) * frac))
+
+
+def batch_message(prefix: str, current: int, total: int, percent: int, detail: str) -> str:
+    """'Elaborazione: documento 2 di 4 (50%) — nome.pdf: indicizzazione vettoriale in corso…'"""
+    return f"{prefix}: documento {current} di {total} ({percent}%) — {detail}"
+
+
+# Platform pipeline (analysis + report) milestones: (percent, Italian stage label)
+PIPELINE_STAGES: Tuple[Tuple[int, str], ...] = (
+    (20, "Lettura e validazione dei documenti attivi dell'area di lavoro"),
+    (40, "Controlli di conformità deterministici e sincronizzazione delle scadenze (DB allerte)"),
+    (70, "Compilazione della cartella Excel multi-foglio e generazione dei grafici di trend"),
+    (90, "Composizione del report Word di audit firmato"),
+    (100, "Pipeline completata con successo: link di download pronti"),
+)
+
+
+def show_pipeline_stage(bar, caption, stage: int, percent: Optional[int] = None, detail: str = "") -> None:
+    """Moves the progress `bar` to stage `stage` (0-based) and writes its Italian label beneath it."""
+    pct, label = PIPELINE_STAGES[stage]
+    pct = pct if percent is None else percent
+    bar.progress(min(100, max(0, pct)) / 100, text=f"Fase {stage + 1} di {len(PIPELINE_STAGES)} — {pct}%")
+    caption.caption(f"{label}{' — ' + detail if detail else ''}")
 
 
 def progress_bar(slot, done: int, total: int, label: str = "") -> None:

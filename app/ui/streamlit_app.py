@@ -9,7 +9,7 @@ if str(ROOT_DIR) not in sys.path:
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from pathlib import Path
 from PIL import Image
 
@@ -28,7 +28,9 @@ from app.ui.theme import (
     danger_zone_marker,
     layout_split_marker,
     loader,
-    progress_bar,
+    batch_message,
+    progress_percent,
+    show_pipeline_stage,
 )
 from app.alerts.store import (
     ensure_alert_tables,
@@ -110,6 +112,7 @@ def initialize_session():
     st.session_state.setdefault("routing_overrides", {})  # doc -> (mid, schema) | None (user choice)
     st.session_state.setdefault("routed_to", {})          # doc -> route actually extracted
     st.session_state.setdefault("platform_xlsx", None)    # (bytes, datetime)
+    st.session_state.setdefault("platform_docx", None)    # (bytes, filename prefix) - same snapshot as platform_xlsx
     st.session_state.setdefault("last_dispatch_result", None)
 
     if "company_profile" not in st.session_state:
@@ -148,12 +151,17 @@ def remove_single_document(doc_name: str) -> None:
         if k in ss and isinstance(ss[k], dict):
             ss[k].pop(doc_name, None)
     ss.platform_xlsx = None
+    ss.platform_docx = None
 
 
-def process_single_document(file) -> int:
+def process_single_document(file, on_step=None) -> int:
+    """Indexes one uploaded file. `on_step(fraction, label)` (optional) reports real progress through the stages."""
+    step = on_step or (lambda fraction, label: None)
+    step(0.05, "lettura del documento")
     pages = load_document_content(file, file.name)
     if not pages:
         raise ValueError("Nessun testo leggibile estratto dal documento.")
+    step(0.2, "suddivisione in segmenti")
 
     for p in pages:
         p["document_name"] = file.name
@@ -163,8 +171,10 @@ def process_single_document(file) -> int:
         raise ValueError("Il documento non ha prodotto chunk validi.")
 
     chunk_texts = [c["text"] for c in chunks]
+    step(0.35, f"{len(chunks)} segmenti - indicizzazione vettoriale in corso")
     embeddings = get_batch_embeddings(chunk_texts)
 
+    step(0.85, f"{len(chunks)} segmenti - salvataggio nell'indice")
     remove_document_from_chromadb(file.name, collection_name="document_chunks")
     store_chunks_in_chromadb(chunks, embeddings, collection_name="document_chunks")
     doc_id = create_document(st.session_state.user_id, file.name)
@@ -216,6 +226,26 @@ def _build_platform_report(labels: Dict[Any, str], effective: Dict[str, Any]) ->
         ),
         datetime.now(),
     )
+
+
+def _build_platform_word(preferred_module: str) -> Tuple[bytes, str]:
+    """Word audit report for the module that actually holds records (the preferred one first); returns (bytes, prefix)."""
+    ss = st.session_state
+    target_mid = preferred_module
+    if not any(v.get("records") for v in build_export_payload(target_mid).values()):
+        for cand_mid in ss.extracted_data:
+            if any(v.get("records") for v in build_export_payload(cand_mid).values()):
+                target_mid = cand_mid
+                break
+    prefix = get_module(target_mid).report.get("filename_prefix", "REPORT")
+    data = create_styled_word_report(
+        extracted_data_by_schema=build_export_payload(target_mid),
+        source_documents=list(ss.indexed_documents),
+        company_profile=ss.company_profile,
+        selected_fields_by_schema=ss.export_fields.get(target_mid, {}),
+        module_id=target_mid,
+    )
+    return data, prefix
 
 
 def render_platform_pipeline(preferred_module: str) -> None:
@@ -273,62 +303,52 @@ def render_platform_pipeline(preferred_module: str) -> None:
             help="Ricostruisce il fascicolo Excel includendo le modifiche fatte nella griglia di revisione.",
         )
 
-        if run:
-            for doc, route in effective.items():
-                old = ss.routed_to.get(doc)
-                if old and old != route:
-                    evict_document(ss.extracted_data, ss.reviewed_data, ss.editor_version, doc, only_route=old)
-                    ss.routed_to.pop(doc, None)
-
-            tasks = pending_tasks(effective, ss.extracted_data)
-            pages_by_doc = {n: m["pages"] for n, m in docs.items()}
+        if run or rebuild:
+            stage_bar, stage_caption = st.empty(), st.empty()
+            show_pipeline_stage(stage_bar, stage_caption, 0)                      # 20% - read & validate workspace
             failures = {}
-            if tasks:
-                with st.status(f"Estrazione in corso: {len(tasks)} operazioni…", expanded=True) as status:
-                    bar = st.empty()
-                    progress_bar(bar, 0, len(tasks), "Analisi intelligente dei documenti")
+            if run:
+                for doc, route in effective.items():
+                    old = ss.routed_to.get(doc)
+                    if old and old != route:
+                        evict_document(ss.extracted_data, ss.reviewed_data, ss.editor_version, doc, only_route=old)
+                        ss.routed_to.pop(doc, None)
 
-                    def on_progress(done, total, doc, sname, err):
-                        progress_bar(bar, done, total, "Analisi intelligente dei documenti")
-                        st.write(f"{'✗' if err else '✓'} **{doc}** → `{sname}`" + (f" — {err}" if err else ""))
-                        if err:
-                            failures[doc] = err
+                tasks = pending_tasks(effective, ss.extracted_data)
+                pages_by_doc = {n: m["pages"] for n, m in docs.items()}
+                if tasks:
+                    show_pipeline_stage(stage_bar, stage_caption, 1, percent=20)  # 20 -> 40% while extracting
+                    with st.status(f"Estrazione in corso: {len(tasks)} operazioni…", expanded=True) as status:
+                        def on_progress(done, total, doc, sname, err):
+                            pct = progress_percent(done, total, 20, 40)
+                            show_pipeline_stage(stage_bar, stage_caption, 1, percent=pct,
+                                                detail=f"documento {done} di {total}")
+                            st.write(f"{'✗' if err else '✓'} **{doc}** → `{sname}`" + (f" — {err}" if err else ""))
+                            if err:
+                                failures[doc] = err
 
-                    results = run_batch_extraction(tasks, pages_by_doc, max_workers=3, on_progress=on_progress)
-                    apply_results(ss.extracted_data, ss.reviewed_data, ss.editor_version, ss.routed_to, results)
-                    status.update(label=f"Estrazione completata ({len(tasks) - len(failures)}/{len(tasks)} OK)",
-                                  state="complete" if not failures else "error", expanded=bool(failures))
-            else:
-                st.info("Nessun documento nuovo da analizzare.")
+                        results = run_batch_extraction(tasks, pages_by_doc, max_workers=3, on_progress=on_progress)
+                        apply_results(ss.extracted_data, ss.reviewed_data, ss.editor_version, ss.routed_to, results)
+                        status.update(label=f"Estrazione completata ({len(tasks) - len(failures)}/{len(tasks)} OK)",
+                                      state="complete" if not failures else "error", expanded=bool(failures))
+                else:
+                    st.info("Nessun documento nuovo da analizzare.")
 
-            with loader("Generazione del fascicolo", "Sincronizzazione scadenze e creazione Excel…", "sheet"):
-                payload = collect_payload(ss.extracted_data, ss.reviewed_data)
-                n_dl = sync_deadlines_to_db(payload, docs.keys())
-                _build_platform_report(labels, effective)
-            st.success(f"Fascicolo pronto · {n_dl} scadenze sincronizzate per il monitoraggio.")
-        elif rebuild:
-            with loader("Rigenerazione del fascicolo", "Inclusione delle modifiche di revisione…", "sheet"):
-                sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), docs.keys())
-                _build_platform_report(labels, effective)
+            show_pipeline_stage(stage_bar, stage_caption, 1)                      # 40% - checks & deadline sync
+            n_dl = sync_deadlines_to_db(collect_payload(ss.extracted_data, ss.reviewed_data), docs.keys())
+            show_pipeline_stage(stage_bar, stage_caption, 2)                      # 70% - Excel + trend charts
+            _build_platform_report(labels, effective)
+            show_pipeline_stage(stage_bar, stage_caption, 3)                      # 90% - Word report
+            ss.platform_docx = _build_platform_word(preferred_module)
+            show_pipeline_stage(stage_bar, stage_caption, 4)                      # 100% - done
+            if run:
+                st.success(f"Fascicolo pronto · {n_dl} scadenze sincronizzate per il monitoraggio.")
 
         if ss.platform_xlsx:
             data, ts = ss.platform_xlsx
-            target_mid = preferred_module
-            if not any(v.get("records") for v in build_export_payload(target_mid).values()):
-                for cand_mid in ss.extracted_data:
-                    if any(v.get("records") for v in build_export_payload(cand_mid).values()):
-                        target_mid = cand_mid
-                        break
-            mod_obj = get_module(target_mid)
-            prefix = mod_obj.report.get("filename_prefix", "REPORT")
-            word_payload = build_export_payload(target_mid)
-            word_bytes = create_styled_word_report(
-                extracted_data_by_schema=word_payload,
-                source_documents=list(docs),
-                company_profile=ss.company_profile,
-                selected_fields_by_schema=ss.export_fields.get(target_mid, {}),
-                module_id=target_mid,
-            )
+            if ss.platform_docx is None:                                          # snapshot missing (older session)
+                ss.platform_docx = _build_platform_word(preferred_module)
+            word_bytes, prefix = ss.platform_docx
             c_dl_xlsx, c_dl_docx = st.columns(2)
             with c_dl_xlsx:
                 st.download_button(
@@ -479,13 +499,24 @@ def render_ui():
             todo = [f for f in uploaded_files if f.name not in ss.indexed_documents and f.name not in ss.processing_errors]
             if todo:
                 with st.status(f"Indicizzazione di {len(todo)} documenti…", expanded=True) as status:
-                    for f in todo:
+                    total = len(todo)
+                    bar = st.progress(0.0, text=batch_message("Elaborazione", 1, total, 0, "avvio dell'indicizzazione…"))
+                    for idx, f in enumerate(todo):
+                        def on_step(fraction, label, idx=idx, f=f):
+                            pct = progress_percent(idx + fraction, total)
+                            bar.progress(pct / 100, text=batch_message("Elaborazione", idx + 1, total, pct, f"{f.name}: {label}"))
+
                         try:
-                            with loader(f"Lettura di {f.name}", "Indicizzazione e preparazione della ricerca documentale…", "orbit"):
-                                count = process_single_document(f)
+                            count = process_single_document(f, on_step=on_step)
+                            pct = progress_percent(idx + 1, total)
+                            bar.progress(pct / 100, text=batch_message(
+                                "Elaborazione", idx + 1, total, pct, f"{f.name}: {count} segmenti indicizzati"))
                             st.write(f"✓ {f.name} — {count} segmenti indicizzati")
                         except Exception as exc:
                             ss.processing_errors[f.name] = str(exc)
+                            pct = progress_percent(idx + 1, total)
+                            bar.progress(pct / 100, text=batch_message(
+                                "Elaborazione", idx + 1, total, pct, f"{f.name}: lettura non riuscita"))
                             st.write(f"✕ {f.name} — {exc}")
                     status.update(label="Indicizzazione completata", state="complete", expanded=False)
 
@@ -643,14 +674,25 @@ def render_ui():
             if st.button("Avvia estrazione strutturata", icon=":material/bolt:", type="primary", use_container_width=True):
                 chosen = ss.indexed_documents if target == "ALL ACTIVE DOCUMENTS" else {target: ss.indexed_documents[target]}
                 pages_map = {name: meta["pages"] for name, meta in chosen.items()}
-                with loader(f"Estrazione: {schema.label}", "Normalizzazione e calcoli deterministici…", "bar"):
-                    result = extract_for_documents(pages_map, schema_name, module_id=mid)
-                    done = [d for d in pages_map if d not in result.get("errors", {})]
-                    existing = ss.extracted_data.get(mid, {}).get(schema_name)
-                    ss.extracted_data.setdefault(mid, {})[schema_name] = merge_result(existing, {**result, "processed_documents": done})
-                    ss.reviewed_data.setdefault(mid, {}).pop(schema_name, None)
-                    vkey = (mid, schema_name)
-                    ss.editor_version[vkey] = ss.editor_version.get(vkey, 0) + 1
+                total_docs = len(pages_map)
+                bar = st.progress(0.0, text=batch_message(
+                    "Estrazione", 1, total_docs, 0, "analisi, normalizzazione e calcoli deterministici in corso…"))
+
+                def on_extract_progress(done, total, doc, err):
+                    pct = progress_percent(done, total, 0, 90)           # last 10%: consolidation of the results
+                    detail = f"{doc}: " + ("errore, si prosegue con i successivi" if err
+                                           else "normalizzazione e calcoli deterministici completati")
+                    bar.progress(pct / 100, text=batch_message("Estrazione", done, total, pct, detail))
+
+                result = extract_for_documents(pages_map, schema_name, module_id=mid, on_progress=on_extract_progress)
+                bar.progress(0.95, text="Consolidamento dei record e validazione dello schema (95%)…")
+                done = [d for d in pages_map if d not in result.get("errors", {})]
+                existing = ss.extracted_data.get(mid, {}).get(schema_name)
+                ss.extracted_data.setdefault(mid, {})[schema_name] = merge_result(existing, {**result, "processed_documents": done})
+                ss.reviewed_data.setdefault(mid, {}).pop(schema_name, None)
+                vkey = (mid, schema_name)
+                ss.editor_version[vkey] = ss.editor_version.get(vkey, 0) + 1
+                bar.progress(1.0, text=f"Estrazione: {schema.label} completata (100%)")
                 for name, error in result.get("errors", {}).items():
                     st.warning(f"{name}: {error}")
                 if not result.get("errors"):

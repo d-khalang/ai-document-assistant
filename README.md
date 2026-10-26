@@ -98,7 +98,7 @@ Domain logic resides entirely in external JSON files (`schemas/*.json`):
 | **Relational Database** | SQLite (`sqlite3`) | Users, conversations, company tenant profiles, deadlines, and alert logs (WAL mode) |
 | **Document Parsers** | `pypdf`, `pymupdf`, `python-docx`, `pandas`, `openpyxl`, `Pillow` | Robust multimodal and spreadsheet ingestors |
 | **Charts** | `matplotlib` | Monthly/yearly consumption and cost charts (PNG) embedded in the Excel and Word reports |
-| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (97/97 passing) |
+| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (113/113 passing) |
 
 ---
 
