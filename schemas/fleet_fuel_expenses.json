@@ -22,6 +22,7 @@
         "strong_keywords": ["carburante", "rifornimento", "gasolio", "fuel card", "distributore"],
         "keywords": ["targa", "litri", "importo", "chilometri", "benzina", "scontrino"]
       },
+      "analytics": {"period_fields": ["data_rifornimento"], "dimension_field": "targa", "dimension_label": "Targa", "metrics": [{"field": "litri", "kind": "quantity", "label": "Carburante", "unit": "L"}, {"field": "importo_eur", "kind": "cost", "label": "Spesa carburante", "unit": "€"}]},
       "fields": {
         "targa": {"type": "plate", "label": "Targa", "required": true, "description": "Targa del mezzo"},
         "data_rifornimento": {"type": "date", "label": "Data Rifornimento", "description": "Data del rifornimento"},

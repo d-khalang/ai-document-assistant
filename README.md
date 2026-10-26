@@ -97,7 +97,8 @@ Domain logic resides entirely in external JSON files (`schemas/*.json`):
 | **Vector Store** | ChromaDB | Persistent local vector store configured with Cosine similarity |
 | **Relational Database** | SQLite (`sqlite3`) | Users, conversations, company tenant profiles, deadlines, and alert logs (WAL mode) |
 | **Document Parsers** | `pypdf`, `pymupdf`, `python-docx`, `pandas`, `openpyxl`, `Pillow` | Robust multimodal and spreadsheet ingestors |
-| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (65/65 passing) |
+| **Charts** | `matplotlib` | Monthly/yearly consumption and cost charts (PNG) embedded in the Excel and Word reports |
+| **Test Framework** | Pytest | Automated test suite with dynamic temp-database isolation (97/97 passing) |
 
 ---
 
@@ -138,6 +139,8 @@ ai-document-assistant/
 │   │   ├── common.py           # Scope resolvers, column planners, and legacy mappings
 │   │   ├── excel_exporter.py   # Multi-sheet audit Excel generator (openpyxl)
 │   │   ├── platform_excel_exporter.py # 4-sheet universal executive platform workbook
+│   │   ├── analytics.py        # Deterministic monthly/yearly aggregation + like-for-like YoY (pure)
+│   │   ├── charts.py           # Corporate bar charts (matplotlib -> PNG bytes)
 │   │   └── word_exporter.py    # Formal signed Word report generator (python-docx)
 │   ├── ui/
 │   │   ├── streamlit_app.py    # Main UI application layout, tabs, and event handlers

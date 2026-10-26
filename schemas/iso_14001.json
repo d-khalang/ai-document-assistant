@@ -41,6 +41,7 @@
           "strong_keywords": ["parco veicoli", "revisione", "consumo carburante"],
           "keywords": ["targa", "km percorsi", "chilometri", "litri", "veicol*", "mezzo", "modello"]
         },
+      "analytics": {"period_fields": ["periodo"], "dimension_field": "targa", "dimension_label": "Targa", "metrics": [{"field": "litri", "kind": "quantity", "label": "Carburante", "unit": "L"}]},
       "fields": {
         "targa": {"type": "plate", "label": "Targa Mezzo", "required": true, "description": "Targa del veicolo es. AA123BB"},
         "modello": {"type": "string", "label": "Modello / Descrizione", "description": "Marca e modello veicolo"},
@@ -60,6 +61,7 @@
           "strong_keywords": ["pod", "pdr", "kwh", "smc", "contatore", "consumi"],
           "keywords": ["fornitore", "acqua", "gas", "fasce", "f1", "f2", "f3", "periodo fatturato", "energia elettrica"]
         },
+      "analytics": {"period_fields": ["periodo_riferimento"], "dimension_field": "tipo_utenza", "dimension_label": "Tipo utenza", "metrics": [{"field": "consumo_totale", "kind": "quantity", "label": "Consumo", "unit_field": "unita_misura"}, {"field": "totale_spesa_eur", "kind": "cost", "label": "Spesa utenze", "unit": "€"}]},
       "fields": {
         "ragione_sociale": {"type": "string", "label": "Azienda / Ragione Sociale", "description": "COMPLETE legal name of the company the document refers to (Ragione Sociale), exactly as written and INCLUDING the legal form (e.g. \"ALPHA S.R.L.\", \"BETA S.p.A.\", \"GAMMA S.N.C.\"). Never cut it to the first word and never add the address. null if absent."},
         "sede_indirizzo": {"type": "string", "label": "Sede / Indirizzo", "description": "COMPLETE address of the supply point / customer site (sede legale, sede operativa or ubicazione impianto): street, number, municipality and province as written, e.g. \"VIA ROMA, 100 - BORGARO (TO)\". null if absent."},

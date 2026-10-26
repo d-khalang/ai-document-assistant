@@ -8,6 +8,8 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
 
+from app.reporting.analytics import ConsumptionAnalysis, analyze_payload, format_it, period_label
+from app.reporting.charts import render_monthly_chart
 from app.reporting.common import (
     resolve_scope,
     report_meta,
@@ -45,6 +47,87 @@ def _style_table_grid(table, border_color: str = "C8D6C5"):
     )
     tbl_pr.append(parse_xml(borders_xml))
     tbl_pr.append(parse_xml(cell_mar_xml))
+
+
+TREND_SECTION_TITLE = "Analisi Grafica dei Consumi e Trend Economico"
+
+
+def _plain_cell(cell, text: str, bold: bool = False, align=None, size: float = 9, color: Optional[RGBColor] = None):
+    cell.text = ""
+    par = cell.paragraphs[0]
+    if align is not None:
+        par.alignment = align
+    run = par.add_run(text)
+    run.font.name = "Segoe UI"
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    if color is not None:
+        run.font.color.rgb = color
+    cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+
+def _summary_rows(a: ConsumptionAnalysis) -> List[Tuple[str, str]]:
+    """Management summary: period, total cost, total volume and peak month — all straight from the aggregated matrices."""
+    rows = [("Periodo analizzato", f"{period_label(a.period_first)} – {period_label(a.period_last)}")]
+    for m in a.matrices:
+        unit = f" {m.unit}" if m.unit else ""
+        if m.kind == "cost":
+            rows.append((f"Spesa totale del periodo — {m.label}", f"{format_it(m.grand_total)}{unit}"))
+        else:
+            rows.append((f"Consumo totale — {m.label}", f"{format_it(m.grand_total)}{unit}"))
+            if m.peak:
+                y, mo, v = m.peak
+                rows.append((f"Mese di picco — {m.label}", f"{period_label((y, mo))} ({format_it(v)}{unit})"))
+    rows.append(("Record considerati", str(a.records_used)))
+    if a.records_spanning:
+        rows.append(("Periodi su due mesi", f"{a.records_spanning} (attribuiti al mese di fine periodo)"))
+    if a.records_unplaced:
+        rows.append(("Record esclusi", f"{a.records_unplaced} (periodo assente o non attribuibile a un singolo mese)"))
+    return rows
+
+
+def _add_trend_section(doc, analyses: List[ConsumptionAnalysis], sec_no: int, color: RGBColor) -> None:
+    h = doc.add_heading(level=1)
+    run_h = h.add_run(f"{sec_no}. {TREND_SECTION_TITLE}")
+    run_h.font.name = "Segoe UI"
+    run_h.font.color.rgb = color
+
+    for a in analyses:
+        p_sub = doc.add_paragraph()
+        p_sub.paragraph_format.space_before = Pt(4)
+        p_sub.paragraph_format.space_after = Pt(4)
+        r_sub = p_sub.add_run(a.label)
+        r_sub.font.name = "Segoe UI"
+        r_sub.font.size = Pt(11)
+        r_sub.font.bold = True
+        r_sub.font.color.rgb = color
+
+        for m in a.matrices:
+            unit = f" ({m.unit})" if m.unit else ""
+            png = render_monthly_chart(m, title=f"{m.label}{unit}")
+            if png is None:
+                continue
+            frame = doc.add_table(rows=1, cols=1)        # corporate frame around the picture
+            frame.alignment = WD_TABLE_ALIGNMENT.CENTER
+            _style_table_grid(frame, "8CC63F")
+            cell = frame.rows[0].cells[0]
+            par = cell.paragraphs[0]
+            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            par.add_run().add_picture(png, width=Inches(6.3))
+            doc.add_paragraph().paragraph_format.space_after = Pt(4)
+
+        table = doc.add_table(rows=1, cols=2)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _style_table_grid(table, "C8D6C5")
+        for cell, text in zip(table.rows[0].cells, ("Sintesi gestionale", "Valore")):
+            _set_cell_shading(cell, "1E4D2B")
+            _plain_cell(cell, text, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, size=9, color=RGBColor(255, 255, 255))
+        for label, value in _summary_rows(a):
+            cells = table.add_row().cells
+            _set_cell_shading(cells[0], "EFF5EE")
+            _plain_cell(cells[0], label, bold=True, size=9, color=color)
+            _plain_cell(cells[1], value, size=9)
+        doc.add_paragraph().paragraph_format.space_after = Pt(8)
 
 
 def create_styled_word_report(
@@ -359,6 +442,12 @@ def create_styled_word_report(
                     r_item.font.size = Pt(9.5)
 
             doc.add_paragraph().paragraph_format.space_after = Pt(8)
+
+    # تحلیل گرافیکی مصرف/هزینه: فقط اگر رکوردهای مصرفی معتبر وجود داشته باشند (در غیر این صورت هیچ بخشی درج نمی‌شود)
+    analyses = analyze_payload({module.module_id: scoped_data}) if module else []
+    if analyses:
+        sec_no += 1
+        _add_trend_section(doc, analyses, sec_no, COLOR_PRIMARY)
 
     # بخش پایانی: کادرهای امضا (داینامیک بر اساس ماژول)
     signs = signoff_labels(meta, comp)

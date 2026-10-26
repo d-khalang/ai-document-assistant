@@ -21,11 +21,14 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import openpyxl
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from app.alerts.deadlines import extract_deadlines_from_records
 from app.extraction.registry import SchemaDef, get_module, resolve_schema
+from app.reporting.analytics import ConsumptionAnalysis, MONTH_FULL, analyze_payload, period_label
+from app.reporting.charts import render_monthly_chart
 from app.reporting.common import cell_value, column_plan, sheet_title_for
 from app.reporting.expansion import expand_record, unit_key
 
@@ -250,6 +253,106 @@ def _record_status(rec: Dict[str, Any]) -> str:
         return "Da verificare"
     sts = {f.get("status") for f in (rec.get("fields") or {}).values() if isinstance(f, dict)}
     return "Modificato" if "EDITED" in sts else "Estratto"
+
+
+# ----------------------------------------------------------------------------- consumption trend sheet
+TREND_SHEET = "Trend & Analisi Consumi"
+CHART_WIDTH_PX = 720
+NUM_FMT = "#,##0.00"
+
+
+def _trend_sheet(wb, analyses: List[ConsumptionAnalysis]) -> None:
+    """Monthly matrix (months x years, totals, averages, like-for-like YoY) + chart next to it, for every analysed schema."""
+    ws = wb.create_sheet(TREND_SHEET)
+    border = _border()
+    data_font = _font(size=FONT_DATA)
+    bold = _font(size=FONT_DATA, bold=True)
+    meta_font = _font(size=FONT_DATA, italic=True, color="555555")
+    total_fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+
+    _put(ws, 1, 1, "TREND & ANALISI CONSUMI", _font(size=16, bold=True, color=GREEN))
+    _put(ws, 2, 1, "Somme dei soli valori estratti (nessuna stima). Mesi senza dato = '-'. Variazioni calcolate sui soli mesi "
+                   "presenti in entrambi gli anni.", meta_font, Alignment(wrap_text=False))
+    row = 4
+    max_cols = 1
+    for a in analyses:
+        _put(ws, row, 1, f"{a.label} — {period_label(a.period_first)} / {period_label(a.period_last)}",
+             _font(size=12, bold=True, color=GREEN), Alignment(wrap_text=False))
+        notes = [f"{a.records_used} record attribuiti a un mese"]
+        if a.records_spanning:
+            notes.append(f"{a.records_spanning} con periodo su due mesi attribuiti al mese di fine periodo")
+        if a.records_unplaced:
+            notes.append(f"{a.records_unplaced} non attribuibili (periodo assente o superiore al limite) e quindi esclusi")
+        _put(ws, row + 1, 1, " · ".join(notes), meta_font, Alignment(wrap_text=False))
+        row += 3
+
+        for m in a.matrices:
+            years = list(m.years)
+            unit = f" ({m.unit})" if m.unit else ""
+            _put(ws, row, 1, f"{m.label}{unit}", _font(size=11, bold=True), Alignment(wrap_text=False))
+            _header(ws, ["Mese"] + [str(y) for y in years], row=row + 1)
+            top = row + 2
+            r = top
+            for mi in range(12):
+                _put(ws, r, 1, MONTH_FULL[mi], data_font, Alignment(horizontal="left"), border)
+                for c, y in enumerate(years, start=2):
+                    v = m.total.values[y][mi]
+                    _put(ws, r, c, v if v is not None else "-", data_font, Alignment(horizontal="center"), border)
+                    if v is not None:
+                        ws.cell(row=r, column=c).number_format = NUM_FMT
+                r += 1
+            summary = (("Totale", m.total.totals, NUM_FMT), ("Media mensile", m.total.monthly_avg, NUM_FMT),
+                       ("Mesi con dato", m.total.months_with_data, "0"))
+            for label, source, fmt in summary:
+                _put(ws, r, 1, label, bold, Alignment(horizontal="left"), border, total_fill)
+                for c, y in enumerate(years, start=2):
+                    v = source.get(y)
+                    _put(ws, r, c, v if v is not None else "-", bold, Alignment(horizontal="center"), border, total_fill)
+                    if v is not None:
+                        ws.cell(row=r, column=c).number_format = fmt
+                r += 1
+            if m.yoy:
+                by_year = {y.year: y for y in m.yoy}
+                for label, attr, fmt in (("Var. assoluta vs anno prec.", "delta", NUM_FMT),
+                                         ("Var. % vs anno prec.", "delta_pct", '0.0"%"'),
+                                         ("Mesi confrontati", "months_compared", "0")):
+                    _put(ws, r, 1, label, data_font, Alignment(horizontal="left"), border)
+                    for c, y in enumerate(years, start=2):
+                        v = getattr(by_year[y], attr) if y in by_year else None
+                        _put(ws, r, c, v if v is not None else "-", data_font, Alignment(horizontal="center"), border)
+                        if v is not None:
+                            ws.cell(row=r, column=c).number_format = fmt
+                    r += 1
+            if len(m.by_dimension) > 1:
+                r += 1
+                _header(ws, [a.dimension_label or "Dettaglio"] + [str(y) for y in years] + ["Totale"], row=r)
+                r += 1
+                for s_ in m.by_dimension:
+                    _put(ws, r, 1, s_.name, data_font, Alignment(horizontal="left"), border)
+                    for c, y in enumerate(years, start=2):
+                        v = s_.totals.get(y)
+                        _put(ws, r, c, v if v is not None else "-", data_font, Alignment(horizontal="center"), border)
+                        if v is not None:
+                            ws.cell(row=r, column=c).number_format = NUM_FMT
+                    _put(ws, r, len(years) + 2, sum(s_.totals.values()), bold, Alignment(horizontal="center"), border)
+                    ws.cell(row=r, column=len(years) + 2).number_format = NUM_FMT
+                    r += 1
+            max_cols = max(max_cols, len(years) + 2)
+
+            chart_end = top
+            png = render_monthly_chart(m, title=f"{a.label} — {m.label}{unit}")
+            if png:
+                img = XLImage(png)
+                img.height = int(img.height * CHART_WIDTH_PX / img.width)
+                img.width = CHART_WIDTH_PX
+                ws.add_image(img, f"{get_column_letter(len(years) + 4)}{row}")
+                chart_end = row + math.ceil(img.height / 20)
+            row = max(r, chart_end) + 2
+        row += 1
+
+    ws.column_dimensions["A"].width = 30
+    for c in range(2, max_cols + 1):
+        ws.column_dimensions[get_column_letter(c)].width = 16
 
 
 # ----------------------------------------------------------------------------- deadlines
@@ -596,6 +699,10 @@ def create_platform_excel_report(
     if not any_analytic:
         ws_e = wb.create_sheet("Dati Estratti (Analitici)")
         _put(ws_e, 1, 1, "Nessun dato analitico estratto. Eseguire l'estrazione nei rispettivi moduli.", meta_font)
+
+    analyses = analyze_payload(payload)          # [] for documents without consumption data -> no sheet, no chart
+    if analyses:
+        _trend_sheet(wb, analyses)
 
     for ws_item in (ws2, ws3):
         _autosize(ws_item)

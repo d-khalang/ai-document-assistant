@@ -69,6 +69,7 @@ class SchemaDef:
     layout: Dict[str, Any] = field(default_factory=dict)
     derived: Dict[str, DerivedDateDef] = field(default_factory=dict)
     chat_guidelines: List[str] = field(default_factory=list)
+    analytics: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def sheet_title(self) -> Optional[str]:
@@ -198,6 +199,28 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
             if unit_label is not None and not (isinstance(unit_label, str) and unit_label.strip()):
                 raise ValueError(f"{src}: {name}.layout.excel_expand.keyed_fields.{kname}.unit_label invalid")
 
+    analytics = raw.get("analytics") or {}
+    if analytics:
+        period_fields = analytics.get("period_fields")
+        if not isinstance(period_fields, list) or not period_fields or any(f not in fields for f in period_fields):
+            raise ValueError(f"{src}: {name}.analytics.period_fields must be a non-empty list of existing fields")
+        dim = analytics.get("dimension_field")
+        if dim is not None and dim not in fields:
+            raise ValueError(f"{src}: {name}.analytics.dimension_field '{dim}' is not a field")
+        max_span = analytics.get("max_span_months", 2)
+        if not isinstance(max_span, int) or isinstance(max_span, bool) or max_span < 1:
+            raise ValueError(f"{src}: {name}.analytics.max_span_months must be a positive int")
+        metrics = analytics.get("metrics")
+        if not isinstance(metrics, list) or not metrics:
+            raise ValueError(f"{src}: {name}.analytics.metrics must be a non-empty list")
+        for met in metrics:
+            if met.get("field") not in fields or fields[met["field"]].type != "number":
+                raise ValueError(f"{src}: {name}.analytics.metrics field '{met.get('field')}' must be an existing number field")
+            if met.get("kind") not in ("quantity", "cost"):
+                raise ValueError(f"{src}: {name}.analytics.metrics '{met['field']}' kind must be 'quantity' or 'cost'")
+            if met.get("unit_field") is not None and met["unit_field"] not in fields:
+                raise ValueError(f"{src}: {name}.analytics.metrics '{met['field']}' unit_field is not a field")
+
     guidelines = (raw.get("chat") or {}).get("guidelines") or []
     if not isinstance(guidelines, list) or not all(isinstance(g, str) and g.strip() for g in guidelines):
         raise ValueError(f"{src}: {name}.chat.guidelines must be a list of non-empty strings")
@@ -258,7 +281,8 @@ def _parse_schema(module_id: str, name: str, raw: Dict[str, Any], src: str) -> S
         routing,
         layout=layout,
         derived=derived,
-        chat_guidelines=[g.strip() for g in guidelines]
+        chat_guidelines=[g.strip() for g in guidelines],
+        analytics=analytics,
     )
 
 @lru_cache(maxsize=1)

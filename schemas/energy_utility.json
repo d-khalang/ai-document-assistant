@@ -23,6 +23,7 @@
         "strong_keywords": ["bolletta", "pod", "kwh", "energia elettrica", "fattura di energia", "eviso", "enel"],
         "keywords": ["consumo", "periodo fatturato", "totale da pagare", "potenza impegnata", "oneri di sistema", "fornitura"]
       },
+      "analytics": {"period_fields": ["periodo_riferimento"], "dimension_field": "codice_pod", "dimension_label": "POD", "metrics": [{"field": "consumo_kwh", "kind": "quantity", "label": "Consumo energia", "unit": "kWh"}, {"field": "costo_totale_eur", "kind": "cost", "label": "Spesa energia", "unit": "€"}]},
       "fields": {
         "fornitore": {
           "type": "string",
