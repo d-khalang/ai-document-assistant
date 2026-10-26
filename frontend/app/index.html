@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conformia — Workspace</title>
+  <meta name="description" content="Workspace di Conformia: documenti, estrazione e revisione, chat RAG con citazioni, scadenziario e alert, analisi consumi e report. Mockup statico." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+<!-- Icon sprite → future <Icon name="…" /> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3cc2a3"/><stop offset="1" stop-color="#0d6658"/></linearGradient>
+  </defs>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 12h8v6H8zM12 12v6M8 15h8"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  <symbol id="i-sms" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-calc" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z"/><path d="M2 21c0-3 1.9-5.4 5.1-6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.6a1 1 0 0 0-.2-.6l-3.5-4.4A1 1 0 0 0 17.5 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ===================== <Sidebar /> ===================== -->
+  <aside class="sidebar">
+    <a class="brand" href="#panoramica" aria-label="Conformia — panoramica">
+      <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#g-brand)"/><path d="M10 8h8l5 5v11a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" fill="#fff" fill-opacity=".95"/><path d="M12.5 19.5c0-3 2.4-5.5 7-5.5 0 4-2.2 6.5-5.4 6.5-.6 0-1.1-.1-1.6-.3" fill="none" stroke="#0d6658" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="brand__name">Conformia</span>
+    </a>
+
+    <!-- <ModuleSwitcher /> -->
+    <button class="module-switch" type="button">
+      <span class="module-switch__icon"><svg class="icon icon--sm"><use href="#i-leaf"/></svg></span>
+      <span class="module-switch__text">
+        <small>Modulo attivo</small>
+        <b>ISO 14001 / 9001 / 45001</b>
+      </span>
+      <svg class="icon icon--sm module-switch__chev"><use href="#i-down"/></svg>
+    </button>
+
+    <nav class="nav" aria-label="Sezioni">
+      <p class="nav__label">Lavoro</p>
+      <a href="#panoramica"><svg class="icon icon--sm"><use href="#i-grid"/></svg>Panoramica</a>
+      <a href="#documenti"><svg class="icon icon--sm"><use href="#i-folder"/></svg>Documenti<span class="nav__count">128</span></a>
+      <a href="#revisione"><svg class="icon icon--sm"><use href="#i-sparkle"/></svg>Estrazione e revisione<span class="nav__badge nav__badge--warn">9</span></a>
+      <a href="#chat"><svg class="icon icon--sm"><use href="#i-chat"/></svg>Chat sui documenti</a>
+
+      <p class="nav__label">Monitoraggio</p>
+      <a href="#scadenze"><svg class="icon icon--sm"><use href="#i-calendar"/></svg>Scadenziario e alert<span class="nav__badge nav__badge--danger">7</span></a>
+      <a href="#analisi"><svg class="icon icon--sm"><use href="#i-chart"/></svg>Analisi consumi</a>
+
+      <p class="nav__label">Output</p>
+      <a href="#report"><svg class="icon icon--sm"><use href="#i-sheet"/></svg>Report ed export</a>
+      <a href="#impostazioni"><svg class="icon icon--sm"><use href="#i-gear"/></svg>Impostazioni</a>
+    </nav>
+
+    <div class="sidebar__foot">
+      <div class="index-card">
+        <div class="index-card__row"><svg class="icon icon--xs"><use href="#i-database"/></svg>Indice documenti</div>
+        <div class="index-card__value">4.812 <small>blocchi indicizzati</small></div>
+        <div class="meter meter--dark"><i style="--w:62%"></i></div>
+        <small class="index-card__note">128 documenti · 6 moduli</small>
+      </div>
+      <div class="user-chip">
+        <span class="avatar">GF</span>
+        <span class="user-chip__text"><b>Giulia Ferri</b><small>RSGA · Ecoservizi Nord</small></span>
+        <svg class="icon icon--sm"><use href="#i-logout"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== <Shell /> ===================== -->
+  <div class="shell">
+    <header class="topbar">
+      <label class="search">
+        <svg class="icon icon--sm"><use href="#i-search"/></svg>
+        <input type="search" placeholder="Cerca documenti, campi, scadenze…" />
+        <kbd>⌘K</kbd>
+      </label>
+      <div class="topbar__right">
+        <button class="select-btn hide-sm" type="button"><svg class="icon icon--sm"><use href="#i-building"/></svg>Stabilimento Nord<svg class="icon icon--xs"><use href="#i-down"/></svg></button>
+        <button class="icon-btn hide-sm" type="button" aria-label="Aiuto"><svg class="icon icon--sm"><use href="#i-help"/></svg></button>
+        <button class="icon-btn icon-btn--dot" type="button" aria-label="Notifiche"><svg class="icon icon--sm"><use href="#i-bell"/></svg></button>
+        <a class="btn btn--primary" href="#documenti"><svg class="icon icon--sm"><use href="#i-upload"/></svg><span class="hide-sm">Carica documenti</span></a>
+      </div>
+    </header>
+
+    <main class="views">
+
+      <!-- ============================================================
+           VIEW 1 — <Overview />
+           ============================================================ -->
+      <section class="view" id="panoramica" aria-label="Panoramica">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Lunedì 26 ottobre 2026</p>
+            <h1 class="view__title">Buongiorno, Giulia</h1>
+            <p class="view__sub">2 adempimenti scaduti e 9 campi da verificare richiedono la tua attenzione.</p>
+          </div>
+          <div class="view__actions">
+            <a class="btn btn--secondary" href="#report"><svg class="icon icon--sm"><use href="#i-download"/></svg>Esporta report</a>
+            <a class="btn btn--primary" href="#documenti"><svg class="icon icon--sm"><use href="#i-plus"/></svg>Nuovo caricamento</a>
+          </div>
+        </div>
+
+        <!-- <KpiRow /> -->
+        <div class="kpis">
+          <article class="kpi">
+            <span class="kpi__icon"><svg class="icon icon--sm"><use href="#i-folder"/></svg></span>
+            <span class="kpi__label">Documenti indicizzati</span>
+            <span class="kpi__value">128</span>
+            <span class="kpi__foot">6 moduli · 2.104 pagine</span>
+          </article>
+          <article class="kpi">
+            <span class="kpi__icon"><svg class="icon icon--sm"><use href="#i-calendar"/></svg></span>
+            <span class="kpi__label">Scadenze monitorate</span>
+            <span class="kpi__value">42</span>
+            <span class="kpi__foot">Prossima scansione 07:00</span>
+          </article>
+          <article class="kpi kpi--warn">
+            <span class="kpi__icon"><svg class="icon icon--sm"><use href="#i-clock"/></svg></span>
+            <span class="kpi__label">In scadenza ≤ 30 gg</span>
+            <span class="kpi__value">5</span>
+            <span class="kpi__foot">1 entro 7 giorni</span>
+          </article>
+          <article class="kpi kpi--danger">
+            <span class="kpi__icon"><svg class="icon icon--sm"><use href="#i-alert"/></svg></span>
+            <span class="kpi__label">Scadute</span>
+            <span class="kpi__value">2</span>
+            <span class="kpi__foot">Alert inviati al RSPP</span>
+          </article>
+        </div>
+
+        <div class="layout layout--2-1">
+          <!-- <UploadCard /> + <ProcessingQueue /> -->
+          <article class="card">
+            <header class="card__head">
+              <div><h2 class="card__title">Carica e analizza</h2><p class="card__sub">Il modulo e il tipo di documento vengono riconosciuti in automatico</p></div>
+            </header>
+            <div class="card__body upload-grid">
+              <label class="dropzone">
+                <input type="file" multiple hidden />
+                <span class="dropzone__icon"><svg class="icon"><use href="#i-upload"/></svg></span>
+                <b>Trascina qui i file</b>
+                <span>oppure <u>sfoglia</u> dal computer</span>
+                <span class="dropzone__formats">
+                  <span class="ftype ftype--pdf">PDF</span><span class="ftype ftype--xlsx">XLSX</span><span class="ftype ftype--docx">DOCX</span><span class="ftype ftype--img">JPG · PNG</span>
+                </span>
+                <small>Le scansioni vengono lette con OCR automatico</small>
+              </label>
+
+              <div class="queue">
+                <p class="queue__title">In elaborazione <span class="muted">· 3 file</span></p>
+
+                <div class="job">
+                  <div class="job__top">
+                    <span class="ftype ftype--pdf">PDF</span>
+                    <span class="job__name">Verbale_verifica_CE-02.pdf</span>
+                    <span class="job__pct">72%</span>
+                  </div>
+                  <ol class="stages" aria-label="Fasi">
+                    <li class="is-done">Caricamento</li>
+                    <li class="is-done">Lettura</li>
+                    <li class="is-done">Indicizzazione</li>
+                    <li class="is-active">Estrazione</li>
+                    <li>Scadenze</li>
+                  </ol>
+                </div>
+
+                <div class="job">
+                  <div class="job__top">
+                    <span class="ftype ftype--xlsx">XLSX</span>
+                    <span class="job__name">Rifornimenti_Q3_2026.xlsx</span>
+                    <span class="job__pct">38%</span>
+                  </div>
+                  <ol class="stages">
+                    <li class="is-done">Caricamento</li>
+                    <li class="is-done">Lettura</li>
+                    <li class="is-active">Indicizzazione</li>
+                    <li>Estrazione</li>
+                    <li>Scadenze</li>
+                  </ol>
+                </div>
+
+                <div class="job job--done">
+                  <div class="job__top">
+                    <span class="ftype ftype--img">JPG</span>
+                    <span class="job__name">Attestato_Bianchi_scan.jpg</span>
+                    <span class="pill pill--ok">Completato</span>
+                  </div>
+                  <p class="job__note"><svg class="icon icon--xs"><use href="#i-check-circle"/></svg>Riconosciuto: Formazione · 8 campi estratti, 1 scadenza calcolata</p>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- <AlertFeed /> -->
+          <article class="card">
+            <header class="card__head">
+              <div><h2 class="card__title">Alert recenti</h2><p class="card__sub">Email e SMS ai responsabili</p></div>
+              <a class="link" href="#scadenze">Tutti</a>
+            </header>
+            <ul class="feed">
+              <li class="feed__item">
+                <span class="feed__icon feed__icon--danger"><svg class="icon icon--sm"><use href="#i-alert"/></svg></span>
+                <div><b>Verifica periodica carrello CE-02 scaduta</b><small>Email + SMS a M. Gatti · oggi 07:00</small></div>
+              </li>
+              <li class="feed__item">
+                <span class="feed__icon feed__icon--warn"><svg class="icon icon--sm"><use href="#i-clock"/></svg></span>
+                <div><b>Revisione mezzo GH 482 KL tra 5 giorni</b><small>Email a Resp. flotta · oggi 07:00</small></div>
+              </li>
+              <li class="feed__item">
+                <span class="feed__icon feed__icon--warn"><svg class="icon icon--sm"><use href="#i-clock"/></svg></span>
+                <div><b>CPI in scadenza tra 14 giorni</b><small>Digest email a RSPP · ieri 07:00</small></div>
+              </li>
+              <li class="feed__item">
+                <span class="feed__icon feed__icon--ok"><svg class="icon icon--sm"><use href="#i-check"/></svg></span>
+                <div><b>Fattura energia settembre pagata</b><small>Scadenza chiusa da G. Ferri · 23/10</small></div>
+              </li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="layout layout--1-1">
+          <!-- <DeadlineRadar /> -->
+          <article class="card">
+            <header class="card__head">
+              <div><h2 class="card__title">Radar scadenze</h2><p class="card__sub">Soglie di preavviso 30 · 15 · 7 giorni</p></div>
+              <a class="link" href="#scadenze">Scadenziario</a>
+            </header>
+            <ul class="radar">
+              <li class="radar__row">
+                <span class="days days--danger"><b>−24</b>gg</span>
+                <div class="radar__text"><b>Aggiornamento formazione lavoratori — M. Rossi</b><small><svg class="icon icon--xs"><use href="#i-cap"/></svg>Attestati_2021.xlsx · riga 18</small></div>
+                <span class="pill pill--danger">Scaduto</span>
+              </li>
+              <li class="radar__row">
+                <span class="days days--danger"><b>−6</b>gg</span>
+                <div class="radar__text"><b>Verifica periodica carrello elevatore CE-02</b><small><svg class="icon icon--xs"><use href="#i-wrench"/></svg>Registro_manutenzioni.pdf · pag. 3</small></div>
+                <span class="pill pill--danger">Scaduto</span>
+              </li>
+              <li class="radar__row">
+                <span class="days days--warn"><b>5</b>gg</span>
+                <div class="radar__text"><b>Revisione mezzo GH 482 KL</b><small><svg class="icon icon--xs"><use href="#i-truck"/></svg>Libretti_flotta.pdf · pag. 2</small></div>
+                <span class="pill pill--warn">≤ 7 gg</span>
+              </li>
+              <li class="radar__row">
+                <span class="days days--warn"><b>14</b>gg</span>
+                <div class="radar__text"><b>Certificato Prevenzione Incendi</b><small><svg class="icon icon--xs"><use href="#i-shield"/></svg>CPI_rinnovo.pdf · pag. 1</small></div>
+                <span class="pill pill--warn">≤ 15 gg</span>
+              </li>
+              <li class="radar__row">
+                <span class="days days--soft"><b>23</b>gg</span>
+                <div class="radar__text"><b>Rinnovo iscrizione Albo Gestori Ambientali</b><small><svg class="icon icon--xs"><use href="#i-leaf"/></svg>Iscrizione_Albo_2021.pdf · pag. 1</small></div>
+                <span class="pill pill--info">≤ 30 gg</span>
+              </li>
+            </ul>
+          </article>
+
+          <div class="stack">
+            <!-- <AskBox /> -->
+            <article class="card card--ask">
+              <header class="card__head">
+                <div><h2 class="card__title">Chiedi ai tuoi documenti</h2><p class="card__sub">Risposte con fonte e pagina</p></div>
+              </header>
+              <div class="card__body">
+                <label class="ask">
+                  <svg class="icon icon--sm"><use href="#i-sparkle"/></svg>
+                  <input type="text" placeholder="Es. Quali autorizzazioni scadono nel 2027?" />
+                  <a class="btn btn--primary btn--sm" href="#chat"><svg class="icon icon--sm"><use href="#i-send"/></svg></a>
+                </label>
+                <div class="suggestions">
+                  <a class="chip" href="#chat">Chi deve rinnovare la formazione?</a>
+                  <a class="chip" href="#chat">Prescrizioni dell'AUA sulle emissioni</a>
+                  <a class="chip" href="#chat">Costo medio energia 2026</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- <ModuleCoverage /> -->
+            <article class="card">
+              <header class="card__head"><div><h2 class="card__title">Copertura per modulo</h2></div></header>
+              <ul class="coverage">
+                <li><span class="coverage__icon c-green"><svg class="icon icon--xs"><use href="#i-leaf"/></svg></span><span>Sistemi integrati ISO</span><span class="coverage__bar"><i style="--w:86%"></i></span><b>46</b></li>
+                <li><span class="coverage__icon c-amber"><svg class="icon icon--xs"><use href="#i-bolt"/></svg></span><span>Energia &amp; Utenze</span><span class="coverage__bar"><i style="--w:44%"></i></span><b>24</b></li>
+                <li><span class="coverage__icon c-violet"><svg class="icon icon--xs"><use href="#i-cap"/></svg></span><span>Formazione</span><span class="coverage__bar"><i style="--w:38%"></i></span><b>21</b></li>
+                <li><span class="coverage__icon c-blue"><svg class="icon icon--xs"><use href="#i-truck"/></svg></span><span>Flotta</span><span class="coverage__bar"><i style="--w:28%"></i></span><b>15</b></li>
+                <li><span class="coverage__icon c-rose"><svg class="icon icon--xs"><use href="#i-wrench"/></svg></span><span>Manutenzione</span><span class="coverage__bar"><i style="--w:22%"></i></span><b>12</b></li>
+                <li><span class="coverage__icon c-slate"><svg class="icon icon--xs"><use href="#i-folder"/></svg></span><span>Documenti generali</span><span class="coverage__bar"><i style="--w:18%"></i></span><b>10</b></li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 2 — <DocumentLibrary />
+           ============================================================ -->
+      <section class="view" id="documenti" aria-label="Documenti">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Archivio</p>
+            <h1 class="view__title">Documenti</h1>
+            <p class="view__sub">128 documenti indicizzati. Attiva o disattiva i documenti da usare nella chat.</p>
+          </div>
+          <div class="view__actions">
+            <button class="btn btn--secondary" type="button"><svg class="icon icon--sm"><use href="#i-refresh"/></svg>Rielabora selezionati</button>
+            <button class="btn btn--primary" type="button"><svg class="icon icon--sm"><use href="#i-upload"/></svg>Carica documenti</button>
+          </div>
+        </div>
+
+        <div class="layout layout--main-side">
+          <article class="card card--flush">
+            <div class="toolbar">
+              <label class="search search--inline"><svg class="icon icon--sm"><use href="#i-search"/></svg><input type="search" placeholder="Filtra per nome, ente, protocollo…" /></label>
+              <div class="chips">
+                <button class="chip is-active" type="button">Tutti <span>128</span></button>
+                <button class="chip" type="button">Da revisionare <span>4</span></button>
+                <button class="chip" type="button">In elaborazione <span>2</span></button>
+                <button class="chip" type="button">Errori <span>1</span></button>
+              </div>
+              <button class="btn btn--ghost btn--sm" type="button"><svg class="icon icon--sm"><use href="#i-filter"/></svg>Modulo</button>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th class="col-check"><span class="checkbox"></span></th>
+                    <th>Documento</th>
+                    <th>Modulo · Tipo</th>
+                    <th>Stato</th>
+                    <th>Chat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="is-selected">
+                    <td class="col-check"><span class="checkbox is-on"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--pdf">PDF</span><div><b>AUA_2022.pdf</b><small>12 pagine · 2,4 MB · 14/10/2026</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">ISO</span> Autorizzazioni</span><span class="method">Testo nativo</span></div></td>
+                    <td><span class="pill pill--ok">Estratto</span></td>
+                    <td><span class="switch is-on"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--xlsx">XLSX</span><div><b>Attestati_2021.xlsx</b><small>3 fogli · 214 righe · 22/10/2026</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">HR</span> Attestati di formazione</span><span class="method">Foglio di calcolo</span></div></td>
+                    <td><span class="pill pill--warn">Da revisionare</span></td>
+                    <td><span class="switch is-on"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--img">JPG</span><div><b>Attestato_Bianchi_scan.jpg</b><small>1 immagine · 1,1 MB · oggi</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">HR</span> Attestati di formazione</span><span class="method method--ocr"><svg class="icon icon--xs"><use href="#i-scan"/></svg>OCR</span></div></td>
+                    <td><span class="pill pill--ok">Estratto</span></td>
+                    <td><span class="switch is-on"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--pdf">PDF</span><div><b>Verbale_verifica_CE-02.pdf</b><small>4 pagine · scansione · oggi</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">MAC</span> Interventi e verifiche</span><span class="method method--ocr"><svg class="icon icon--xs"><use href="#i-scan"/></svg>OCR</span></div></td>
+                    <td><span class="progress-cell"><span class="meter"><i style="--w:72%"></i></span>Estrazione</span></td>
+                    <td><span class="switch"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--pdf">PDF</span><div><b>Fattura_EN_2026-09.pdf</b><small>3 pagine · 380 KB · 03/10/2026</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">EN</span> Bollette elettriche</span><span class="method">Testo nativo</span></div></td>
+                    <td><span class="pill pill--ok">Estratto</span></td>
+                    <td><span class="switch is-on"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--xlsx">XLSX</span><div><b>Rifornimenti_Q3_2026.xlsx</b><small>1 foglio · 96 righe · oggi</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">FLT</span> Rifornimenti</span><span class="method">Foglio di calcolo</span></div></td>
+                    <td><span class="progress-cell"><span class="meter"><i style="--w:38%"></i></span>Indicizzazione</span></td>
+                    <td><span class="switch"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--docx">DOCX</span><div><b>Procedura_gestione_rifiuti.docx</b><small>18 pagine · 640 KB · 30/09/2026</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">ISO</span> Scadenziario adempimenti</span><span class="method">Testo nativo</span></div></td>
+                    <td><span class="pill pill--neutral">Indicizzato</span></td>
+                    <td><span class="switch is-on"></span></td>
+                  </tr>
+                  <tr>
+                    <td class="col-check"><span class="checkbox"></span></td>
+                    <td><div class="doc"><span class="ftype ftype--pdf">PDF</span><div><b>Contratto_manutenzione_HVAC.pdf</b><small>Protetto da password · 29/09/2026</small></div></div></td>
+                    <td><div class="type"><span><span class="tag">GEN</span> Documento generale</span><span class="method">—</span></div></td>
+                    <td><span class="pill pill--danger">Errore lettura</span></td>
+                    <td><span class="switch is-disabled"></span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <footer class="table-foot">
+              <span>1 selezionato · 8 di 128</span>
+              <div class="pager"><button class="icon-btn" type="button" aria-label="Precedente"><svg class="icon icon--sm" style="transform:rotate(180deg)"><use href="#i-right"/></svg></button><span>1 / 16</span><button class="icon-btn" type="button" aria-label="Successiva"><svg class="icon icon--sm"><use href="#i-right"/></svg></button></div>
+            </footer>
+          </article>
+
+          <!-- <DocumentDetail /> -->
+          <aside class="card detail">
+            <header class="card__head">
+              <div class="doc"><span class="ftype ftype--pdf ftype--lg">PDF</span><div><b>AUA_2022.pdf</b><small>Autorizzazione Unica Ambientale</small></div></div>
+              <button class="icon-btn" type="button" aria-label="Chiudi"><svg class="icon icon--sm"><use href="#i-x"/></svg></button>
+            </header>
+            <div class="card__body">
+              <div class="page-thumbs" aria-hidden="true">
+                <span class="thumb"></span><span class="thumb is-active"></span><span class="thumb"></span><span class="thumb thumb--more">+9</span>
+              </div>
+              <dl class="props">
+                <div><dt>Modulo</dt><dd>ISO 14001 / 9001 / 45001</dd></div>
+                <div><dt>Tipo riconosciuto</dt><dd>Autorizzazioni e titoli abilitativi</dd></div>
+                <div><dt>Ente</dt><dd>Provincia di Bergamo</dd></div>
+                <div><dt>Pagine · blocchi</dt><dd>12 · 48 blocchi indicizzati</dd></div>
+                <div><dt>Campi estratti</dt><dd><span class="mini-meter"><i style="--w:90%"></i></span> 9 di 10</dd></div>
+                <div><dt>Scadenze generate</dt><dd>1 · 14/03/2027</dd></div>
+              </dl>
+              <div class="detail__actions">
+                <a class="btn btn--secondary btn--block" href="#revisione"><svg class="icon icon--sm"><use href="#i-pencil"/></svg>Rivedi estrazione</a>
+                <a class="btn btn--secondary btn--block" href="#chat"><svg class="icon icon--sm"><use href="#i-chat"/></svg>Chiedi a questo documento</a>
+                <button class="btn btn--danger-ghost btn--block" type="button"><svg class="icon icon--sm"><use href="#i-trash"/></svg>Rimuovi dall'indice</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 3 — <ExtractionReview />
+           ============================================================ -->
+      <section class="view" id="revisione" aria-label="Estrazione e revisione">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Risorse Umane — Formazione e Sicurezza</p>
+            <h1 class="view__title">Estrazione e revisione</h1>
+            <p class="view__sub">Controlla i campi estratti prima di esportarli. Le tue correzioni non vengono mai sovrascritte.</p>
+          </div>
+          <div class="view__actions">
+            <button class="select-btn" type="button"><svg class="icon icon--sm"><use href="#i-cap"/></svg>Attestati di formazione<svg class="icon icon--xs"><use href="#i-down"/></svg></button>
+            <button class="btn btn--secondary" type="button"><svg class="icon icon--sm"><use href="#i-calc"/></svg>Ricalcola</button>
+            <button class="btn btn--primary" type="button"><svg class="icon icon--sm"><use href="#i-check"/></svg>Conferma e salva</button>
+          </div>
+        </div>
+
+        <!-- <StatusSummary /> -->
+        <div class="status-summary">
+          <span class="status-count"><span class="status status--extracted">EXTRACTED</span><b>31</b></span>
+          <span class="status-count"><span class="status status--edited">EDITED</span><b>2</b></span>
+          <span class="status-count"><span class="status status--calculated">CALCULATED</span><b>5</b></span>
+          <span class="status-count is-attn"><span class="status status--uncertain">UNCERTAIN</span><b>1</b></span>
+          <span class="status-count is-attn"><span class="status status--missing">MISSING</span><b>1</b></span>
+          <span class="status-summary__progress"><span class="meter"><i style="--w:95%"></i></span>38 di 40 campi pronti</span>
+        </div>
+
+        <div class="layout layout--main-side layout--review">
+          <!-- <ReviewGrid /> -->
+          <article class="card card--flush">
+            <div class="table-wrap">
+              <table class="table table--grid">
+                <thead>
+                  <tr>
+                    <th>Dipendente</th>
+                    <th>Corso / Abilitazione</th>
+                    <th>Rif. normativo</th>
+                    <th>Rilascio</th>
+                    <th>Scadenza</th>
+                    <th>Ore</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="cell cell--extracted">Marco Rossi</td>
+                    <td class="cell cell--extracted">Formazione lavoratori — rischio medio</td>
+                    <td class="cell cell--extracted">D.Lgs. 81/08 art. 37</td>
+                    <td class="cell cell--extracted mono">02/10/2021</td>
+                    <td class="cell cell--calculated mono"><svg class="icon icon--xs"><use href="#i-calc"/></svg>02/10/2026</td>
+                    <td class="cell cell--extracted mono">12</td>
+                  </tr>
+                  <tr class="is-focused">
+                    <td class="cell cell--extracted">Anna Bianchi</td>
+                    <td class="cell cell--extracted">Addetto antincendio — livello 2</td>
+                    <td class="cell cell--extracted">DM 02/09/2021</td>
+                    <td class="cell cell--uncertain mono is-active">03/04/2022<svg class="icon icon--xs"><use href="#i-alert"/></svg></td>
+                    <td class="cell cell--calculated mono"><svg class="icon icon--xs"><use href="#i-calc"/></svg>03/04/2027</td>
+                    <td class="cell cell--extracted mono">8</td>
+                  </tr>
+                  <tr>
+                    <td class="cell cell--extracted">Luca Conti</td>
+                    <td class="cell cell--edited">Preposto</td>
+                    <td class="cell cell--extracted">D.Lgs. 81/08 art. 37</td>
+                    <td class="cell cell--extracted mono">15/01/2025</td>
+                    <td class="cell cell--calculated mono"><svg class="icon icon--xs"><use href="#i-calc"/></svg>15/01/2027</td>
+                    <td class="cell cell--missing mono">—</td>
+                  </tr>
+                  <tr>
+                    <td class="cell cell--extracted">Sara Moretti</td>
+                    <td class="cell cell--extracted">Primo soccorso — gruppo B</td>
+                    <td class="cell cell--extracted">DM 388/2003</td>
+                    <td class="cell cell--extracted mono">11/06/2024</td>
+                    <td class="cell cell--calculated mono"><svg class="icon icon--xs"><use href="#i-calc"/></svg>11/06/2027</td>
+                    <td class="cell cell--extracted mono">12</td>
+                  </tr>
+                  <tr>
+                    <td class="cell cell--extracted">Paolo Gatti</td>
+                    <td class="cell cell--extracted">Conduzione carrelli elevatori</td>
+                    <td class="cell cell--extracted">Accordo Stato-Regioni 2012</td>
+                    <td class="cell cell--extracted mono">20/03/2022</td>
+                    <td class="cell cell--calculated mono"><svg class="icon icon--xs"><use href="#i-calc"/></svg>20/03/2027</td>
+                    <td class="cell cell--extracted mono">12</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <footer class="table-foot">
+              <div class="legend-inline">
+                <span><i class="dot dot--extracted"></i>Estratto</span>
+                <span><i class="dot dot--edited"></i>Modificato</span>
+                <span><i class="dot dot--calculated"></i>Calcolato</span>
+                <span><i class="dot dot--uncertain"></i>Incerto</span>
+                <span><i class="dot dot--missing"></i>Mancante</span>
+              </div>
+              <span class="muted">5 record · fonte e pagina nel pannello a destra</span>
+            </footer>
+          </article>
+
+          <!-- <FieldInspector /> -->
+          <aside class="card inspector">
+            <header class="card__head">
+              <div><p class="inspector__kicker">Campo selezionato</p><h2 class="card__title">Data rilascio attestato</h2></div>
+              <span class="status status--uncertain">UNCERTAIN</span>
+            </header>
+            <div class="card__body">
+              <!-- Source preview with highlight -->
+              <div class="source">
+                <div class="source__bar"><span><svg class="icon icon--xs"><use href="#i-image"/></svg>Attestato_Bianchi_scan.jpg</span><span class="muted">OCR</span></div>
+                <div class="source__page" aria-hidden="true">
+                  <span class="ln ln--title"></span>
+                  <span class="ln ln--80"></span>
+                  <span class="ln ln--60"></span>
+                  <span class="ln ln--90"></span>
+                  <span class="source__hl">rilasciato il <b>3/4/22</b> a seguito del corso</span>
+                  <span class="ln ln--70"></span>
+                  <span class="ln ln--50"></span>
+                  <span class="source__stamp">TIMBRO</span>
+                </div>
+              </div>
+
+              <dl class="props props--tight">
+                <div><dt>Testo sorgente</dt><dd class="mono">"3/4/22"</dd></div>
+                <div><dt>Valore proposto</dt><dd class="mono">03/04/2022</dd></div>
+                <div><dt>Motivo</dt><dd>Formato breve: giorno/mese non univoco</dd></div>
+              </dl>
+
+              <label class="field">
+                <span class="field__label">Correggi valore</span>
+                <span class="field__input"><svg class="icon icon--sm"><use href="#i-calendar"/></svg><input type="text" value="03/04/2022" /></span>
+                <small class="field__hint">Salvando, lo stato passa a <span class="status status--edited">EDITED</span> e la scadenza viene ricalcolata.</small>
+              </label>
+
+              <div class="rule">
+                <span class="rule__icon"><svg class="icon icon--sm"><use href="#i-calc"/></svg></span>
+                <div><b>Scadenza derivata</b><small>Data rilascio + 5 anni → <span class="mono">03/04/2027</span></small></div>
+              </div>
+
+              <div class="inspector__actions">
+                <button class="btn btn--secondary" type="button">Salta</button>
+                <button class="btn btn--primary" type="button"><svg class="icon icon--sm"><use href="#i-check"/></svg>Conferma valore</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 4 — <DocumentChat />
+           ============================================================ -->
+      <section class="view view--fill" id="chat" aria-label="Chat sui documenti">
+        <div class="chat">
+          <!-- <ConversationList /> -->
+          <aside class="chat__list">
+            <button class="btn btn--secondary btn--block" type="button"><svg class="icon icon--sm"><use href="#i-plus"/></svg>Nuova conversazione</button>
+            <p class="chat__group">Oggi</p>
+            <a class="convo is-active" href="#chat"><b>Formazione in scadenza</b><small>Quali attestati scadono entro…</small></a>
+            <a class="convo" href="#chat"><b>Costo energia 2026</b><small>Qual è il costo medio al kWh…</small></a>
+            <p class="chat__group">Settimana scorsa</p>
+            <a class="convo" href="#chat"><b>Prescrizioni AUA</b><small>Limiti emissivi del punto E3…</small></a>
+            <a class="convo" href="#chat"><b>Albo Gestori Ambientali</b><small>Categorie e targhe autorizzate…</small></a>
+            <a class="convo" href="#chat"><b>Verifiche carrelli</b><small>Ultimo verbale CE-02…</small></a>
+          </aside>
+
+          <!-- <Thread /> -->
+          <div class="chat__main">
+            <header class="chat__head">
+              <div>
+                <h1 class="chat__title">Formazione in scadenza</h1>
+                <div class="scope">
+                  <span class="muted">Contesto:</span>
+                  <span class="scope__chip"><span class="ftype ftype--xs ftype--xlsx">XLSX</span>Attestati_2021.xlsx<svg class="icon icon--xs"><use href="#i-x"/></svg></span>
+                  <span class="scope__chip"><span class="ftype ftype--xs ftype--img">JPG</span>Attestato_Bianchi_scan.jpg<svg class="icon icon--xs"><use href="#i-x"/></svg></span>
+                  <span class="scope__chip scope__chip--add"><svg class="icon icon--xs"><use href="#i-plus"/></svg>Documenti</span>
+                </div>
+              </div>
+              <button class="icon-btn" type="button" aria-label="Altro"><svg class="icon icon--sm"><use href="#i-more"/></svg></button>
+            </header>
+
+            <div class="thread">
+              <div class="msg msg--user">
+                <p>Quali attestati di formazione sono scaduti o scadono entro fine anno? Indica i lavoratori coinvolti.</p>
+              </div>
+
+              <div class="msg msg--ai">
+                <span class="msg__avatar"><svg class="icon icon--sm"><use href="#i-sparkle"/></svg></span>
+                <div class="msg__body">
+                  <p>Dai documenti attivi risultano <b>due situazioni</b> da gestire entro il 31/12/2026:</p>
+                  <div class="answer-table">
+                    <div class="answer-table__row answer-table__row--head"><span>Lavoratore</span><span>Corso</span><span>Scadenza</span><span>Stato dato</span></div>
+                    <div class="answer-table__row"><span><b>Marco Rossi</b></span><span>Formazione lavoratori</span><span class="mono t-danger">02/10/2026</span><span><span class="status status--calculated">CALCULATED</span></span></div>
+                    <div class="answer-table__row"><span><b>Anna Bianchi</b></span><span>Antincendio liv. 2</span><span class="mono">03/04/2027</span><span><span class="status status--uncertain">UNCERTAIN</span></span></div>
+                  </div>
+                  <p>L'attestato di <b>Marco Rossi</b> è scaduto da 24 giorni <a class="cite" href="#chat">1</a>. La scadenza è calcolata dalla data di rilascio (02/10/2021) più 5 anni di validità <a class="cite" href="#chat">1</a>.</p>
+                  <p>Per <b>Anna Bianchi</b> la data di rilascio letta dalla scansione è incerta <a class="cite" href="#chat">2</a>: se confermata, la scadenza cade nel 2027 e non rientra nel periodo richiesto. Ti consiglio di verificarla nella revisione.</p>
+                  <div class="msg__tools">
+                    <button class="tool" type="button"><svg class="icon icon--xs"><use href="#i-copy"/></svg>Copia</button>
+                    <a class="tool" href="#revisione"><svg class="icon icon--xs"><use href="#i-pencil"/></svg>Apri in revisione</a>
+                    <button class="tool" type="button"><svg class="icon icon--xs"><use href="#i-refresh"/></svg>Rigenera</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="msg msg--user">
+                <p>E chi fa da preposto nello stabilimento?</p>
+              </div>
+
+              <div class="msg msg--ai">
+                <span class="msg__avatar"><svg class="icon icon--sm"><use href="#i-sparkle"/></svg></span>
+                <div class="msg__body">
+                  <p class="typing"><span></span><span></span><span></span> Sto cercando in 2 documenti…</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- <Composer /> -->
+            <div class="composer">
+              <div class="composer__box">
+                <button class="icon-btn" type="button" aria-label="Allega"><svg class="icon icon--sm"><use href="#i-clip"/></svg></button>
+                <textarea rows="1" placeholder="Fai una domanda sui documenti selezionati…"></textarea>
+                <button class="btn btn--primary btn--icon" type="button" aria-label="Invia"><svg class="icon icon--sm"><use href="#i-send"/></svg></button>
+              </div>
+              <small class="composer__note"><svg class="icon icon--xs"><use href="#i-shield"/></svg>Le risposte si basano solo sui documenti selezionati e citano sempre la fonte.</small>
+            </div>
+          </div>
+
+          <!-- <SourcesPanel /> -->
+          <aside class="chat__sources">
+            <p class="chat__group">Fonti della risposta</p>
+            <article class="source-card is-active">
+              <header><span class="cite">1</span><b>Attestati_2021.xlsx</b></header>
+              <small>Foglio "Lavoratori" · riga 18</small>
+              <p>"Rossi Marco — Formazione generale + specifica rischio medio — rilascio 02/10/2021 — 12 ore"</p>
+              <div class="relevance"><span class="meter"><i style="--w:91%"></i></span>pertinenza 0,91</div>
+            </article>
+            <article class="source-card">
+              <header><span class="cite">2</span><b>Attestato_Bianchi_scan.jpg</b></header>
+              <small>Immagine · OCR</small>
+              <p>"…rilasciato il 3/4/22 a seguito del corso per addetti antincendio, livello 2…"</p>
+              <div class="relevance"><span class="meter"><i style="--w:84%"></i></span>pertinenza 0,84</div>
+            </article>
+            <div class="provenance">
+              <p class="chat__group">Come leggere i dati</p>
+              <ul>
+                <li><span class="status status--extracted">EXTRACTED</span>letto dal documento</li>
+                <li><span class="status status--calculated">CALCULATED</span>calcolato dal sistema</li>
+                <li><span class="status status--uncertain">UNCERTAIN</span>da verificare</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 5 — <Deadlines /> + <Alerts />
+           ============================================================ -->
+      <section class="view" id="scadenze" aria-label="Scadenziario e alert">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Monitoraggio</p>
+            <h1 class="view__title">Scadenziario e alert</h1>
+            <p class="view__sub">Scadenze sincronizzate dai documenti estratti. Scansione automatica ogni giorno alle 07:00.</p>
+          </div>
+          <div class="view__actions">
+            <div class="segmented"><button class="is-active" type="button">Elenco</button><button type="button">Calendario</button></div>
+            <button class="btn btn--primary" type="button"><svg class="icon icon--sm"><use href="#i-refresh"/></svg>Scansiona ora</button>
+          </div>
+        </div>
+
+        <div class="threshold-bar">
+          <a class="threshold threshold--danger" href="#scadenze"><b>2</b><span>Scadute</span></a>
+          <a class="threshold threshold--warn" href="#scadenze"><b>1</b><span>Entro 7 gg</span></a>
+          <a class="threshold threshold--warn-soft" href="#scadenze"><b>2</b><span>Entro 15 gg</span></a>
+          <a class="threshold threshold--info" href="#scadenze"><b>2</b><span>Entro 30 gg</span></a>
+          <a class="threshold threshold--ok" href="#scadenze"><b>35</b><span>Oltre 30 gg</span></a>
+        </div>
+
+        <div class="layout layout--main-side">
+          <article class="card card--flush">
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr><th>Adempimento</th><th>Scadenza</th><th>Giorni</th><th>Ultimo alert</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-violet"><svg class="icon icon--xs"><use href="#i-cap"/></svg></span><div><b>Aggiornamento formazione lavoratori — M. Rossi</b><small>RSPP · Attestati_2021.xlsx</small></div></div></td>
+                    <td class="mono">02/10/2026</td>
+                    <td><span class="pill pill--danger">−24 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg><svg class="icon icon--xs"><use href="#i-sms"/></svg>oggi</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-rose"><svg class="icon icon--xs"><use href="#i-wrench"/></svg></span><div><b>Verifica periodica carrello elevatore CE-02</b><small>Resp. manutenzione · Registro_manutenzioni.pdf</small></div></div></td>
+                    <td class="mono">20/10/2026</td>
+                    <td><span class="pill pill--danger">−6 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg><svg class="icon icon--xs"><use href="#i-sms"/></svg>oggi</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-blue"><svg class="icon icon--xs"><use href="#i-truck"/></svg></span><div><b>Revisione mezzo GH 482 KL</b><small>Resp. flotta · Libretti_flotta.pdf</small></div></div></td>
+                    <td class="mono">31/10/2026</td>
+                    <td><span class="pill pill--warn">5 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg>oggi</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-amber"><svg class="icon icon--xs"><use href="#i-bolt"/></svg></span><div><b>Pagamento fattura energia — ottobre</b><small>Amministrazione · Fattura_EN_2026-10.pdf</small></div></div></td>
+                    <td class="mono">05/11/2026</td>
+                    <td><span class="pill pill--warn">10 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg>ieri</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-green"><svg class="icon icon--xs"><use href="#i-shield"/></svg></span><div><b>Certificato Prevenzione Incendi — rinnovo</b><small>RSPP · CPI_rinnovo.pdf</small></div></div></td>
+                    <td class="mono">09/11/2026</td>
+                    <td><span class="pill pill--warn">14 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg>ieri</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-green"><svg class="icon icon--xs"><use href="#i-leaf"/></svg></span><div><b>Rinnovo iscrizione Albo Gestori Ambientali</b><small>RSGA · Iscrizione_Albo_2021.pdf</small></div></div></td>
+                    <td class="mono">18/11/2026</td>
+                    <td><span class="pill pill--info">23 gg</span></td>
+                    <td><span class="channels"><svg class="icon icon--xs"><use href="#i-mail"/></svg>20/10</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="doc doc--wide"><span class="row-icon c-rose"><svg class="icon icon--xs"><use href="#i-wrench"/></svg></span><div><b>Manutenzione programmata compressore C1</b><small>Resp. manutenzione · Contratto_comp.pdf</small></div></div></td>
+                    <td class="mono">24/11/2026</td>
+                    <td><span class="pill pill--info">29 gg</span></td>
+                    <td><span class="channels muted">—</span></td>
+                    <td><button class="btn btn--ghost btn--sm" type="button">Chiudi</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <div class="stack">
+            <!-- <MiniCalendar /> -->
+            <article class="card">
+              <header class="card__head">
+                <div><h2 class="card__title">Novembre 2026</h2></div>
+                <div class="pager"><button class="icon-btn" type="button" aria-label="Mese precedente"><svg class="icon icon--sm" style="transform:rotate(180deg)"><use href="#i-right"/></svg></button><button class="icon-btn" type="button" aria-label="Mese successivo"><svg class="icon icon--sm"><use href="#i-right"/></svg></button></div>
+              </header>
+              <div class="card__body">
+                <div class="calendar">
+                  <span class="dow">L</span><span class="dow">M</span><span class="dow">M</span><span class="dow">G</span><span class="dow">V</span><span class="dow">S</span><span class="dow">D</span>
+                  <span class="day is-out">26</span><span class="day is-out">27</span><span class="day is-out">28</span><span class="day is-out">29</span><span class="day is-out">30</span><span class="day is-out has-warn">31</span><span class="day">1</span>
+                  <span class="day">2</span><span class="day">3</span><span class="day">4</span><span class="day has-warn">5</span><span class="day">6</span><span class="day">7</span><span class="day">8</span>
+                  <span class="day has-warn">9</span><span class="day">10</span><span class="day">11</span><span class="day">12</span><span class="day">13</span><span class="day">14</span><span class="day">15</span>
+                  <span class="day">16</span><span class="day">17</span><span class="day has-info">18</span><span class="day">19</span><span class="day">20</span><span class="day">21</span><span class="day">22</span>
+                  <span class="day">23</span><span class="day has-info">24</span><span class="day">25</span><span class="day">26</span><span class="day">27</span><span class="day">28</span><span class="day">29</span>
+                  <span class="day">30</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- <NotificationChannels /> -->
+            <article class="card">
+              <header class="card__head"><div><h2 class="card__title">Canali di notifica</h2></div></header>
+              <ul class="channel-list">
+                <li>
+                  <span class="channel-list__icon"><svg class="icon icon--sm"><use href="#i-mail"/></svg></span>
+                  <div><b>Email</b><small>Digest giornaliero · 4 destinatari</small></div>
+                  <span class="pill pill--ok">Attivo</span>
+                </li>
+                <li>
+                  <span class="channel-list__icon"><svg class="icon icon--sm"><use href="#i-sms"/></svg></span>
+                  <div><b>SMS</b><small>Solo scadute ed entro 7 gg</small></div>
+                  <span class="pill pill--warn">Da configurare</span>
+                </li>
+              </ul>
+              <p class="card__note"><svg class="icon icon--xs"><use href="#i-check-circle"/></svg>Ogni alert viene inviato una sola volta per soglia: niente notifiche duplicate.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 6 — <ConsumptionAnalytics />
+           ============================================================ -->
+      <section class="view" id="analisi" aria-label="Analisi consumi">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Energia &amp; Utenze</p>
+            <h1 class="view__title">Analisi consumi e costi</h1>
+            <p class="view__sub">Aggregazioni calcolate dai dati estratti delle fatture. Confronto a parità di mesi.</p>
+          </div>
+          <div class="view__actions">
+            <div class="segmented"><button class="is-active" type="button">Energia</button><button type="button">Carburante</button></div>
+            <button class="select-btn" type="button"><svg class="icon icon--sm"><use href="#i-calendar"/></svg>Gen – Set · 2025 vs 2026<svg class="icon icon--xs"><use href="#i-down"/></svg></button>
+            <button class="select-btn" type="button">POD: tutti<svg class="icon icon--xs"><use href="#i-down"/></svg></button>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <article class="kpi"><span class="kpi__label">Consumo 2026 (gen–set)</span><span class="kpi__value">158.300 <small>kWh</small></span><span class="kpi__foot"><span class="trend trend--down">−4,4%</span> vs stessi mesi 2025</span></article>
+          <article class="kpi"><span class="kpi__label">Spesa 2026 (gen–set)</span><span class="kpi__value">38.150 <small>€</small></span><span class="kpi__foot"><span class="trend trend--up">+2,1%</span> vs stessi mesi 2025</span></article>
+          <article class="kpi"><span class="kpi__label">Costo medio</span><span class="kpi__value">0,241 <small>€/kWh</small></span><span class="kpi__foot"><span class="status status--calculated">CALCULATED</span> spesa / consumo</span></article>
+          <article class="kpi"><span class="kpi__label">Fatture analizzate</span><span class="kpi__value">18</span><span class="kpi__foot">2 POD · 0 campi mancanti</span></article>
+        </div>
+
+        <div class="layout layout--2-1">
+          <!-- <MonthlyBarChart /> two series, validated palette -->
+          <article class="card">
+            <header class="card__head">
+              <div><h2 class="card__title">Consumo mensile di energia</h2><p class="card__sub">kWh · tutti i POD</p></div>
+              <div class="legend">
+                <span><i class="swatch swatch--s1"></i>2025</span>
+                <span><i class="swatch swatch--s2"></i>2026</span>
+              </div>
+            </header>
+            <div class="card__body">
+              <div class="chart" role="img" aria-label="Consumo mensile 2025 e 2026, da gennaio a settembre">
+                <div class="chart__grid" aria-hidden="true">
+                  <span data-v="25k"></span><span data-v="20k"></span><span data-v="15k"></span><span data-v="10k"></span><span data-v="5k"></span><span data-v="0"></span>
+                </div>
+                <div class="chart__plot">
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:85.6%"></span><span class="bar s2" style="--h:80.4%"></span><span class="tip"><b>Gennaio</b>2025 · 21.400 kWh<br>2026 · 20.100 kWh</span><span class="group__x">Gen</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:79.2%"></span><span class="bar s2" style="--h:76%"></span><span class="tip"><b>Febbraio</b>2025 · 19.800 kWh<br>2026 · 19.000 kWh</span><span class="group__x">Feb</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:74.4%"></span><span class="bar s2" style="--h:68.8%"></span><span class="tip"><b>Marzo</b>2025 · 18.600 kWh<br>2026 · 17.200 kWh</span><span class="group__x">Mar</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:64.8%"></span><span class="bar s2" style="--h:63.2%"></span><span class="tip"><b>Aprile</b>2025 · 16.200 kWh<br>2026 · 15.800 kWh</span><span class="group__x">Apr</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:63.6%"></span><span class="bar s2" style="--h:60.4%"></span><span class="tip"><b>Maggio</b>2025 · 15.900 kWh<br>2026 · 15.100 kWh</span><span class="group__x">Mag</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:75.2%"></span><span class="bar s2" style="--h:71.6%"></span><span class="tip"><b>Giugno</b>2025 · 18.800 kWh<br>2026 · 17.900 kWh</span><span class="group__x">Giu</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:88.4%"></span><span class="bar s2" style="--h:84%"></span><span class="tip"><b>Luglio</b>2025 · 22.100 kWh<br>2026 · 21.000 kWh</span><span class="group__x">Lug</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:57.2%"></span><span class="bar s2" style="--h:55.2%"></span><span class="tip"><b>Agosto</b>2025 · 14.300 kWh<br>2026 · 13.800 kWh</span><span class="group__x">Ago</span></div>
+                  <div class="group" tabindex="0"><span class="bar s1" style="--h:73.6%"></span><span class="bar s2" style="--h:73.6%"></span><span class="tip"><b>Settembre</b>2025 · 18.400 kWh<br>2026 · 18.400 kWh</span><span class="group__x">Set</span></div>
+                </div>
+              </div>
+
+              <details class="data-table">
+                <summary><svg class="icon icon--xs"><use href="#i-sheet"/></svg>Mostra tabella dati</summary>
+                <div class="table-wrap">
+                  <table class="table table--compact">
+                    <thead><tr><th>kWh</th><th>Gen</th><th>Feb</th><th>Mar</th><th>Apr</th><th>Mag</th><th>Giu</th><th>Lug</th><th>Ago</th><th>Set</th><th>Totale</th></tr></thead>
+                    <tbody>
+                      <tr><td><i class="swatch swatch--s1"></i>2025</td><td>21.400</td><td>19.800</td><td>18.600</td><td>16.200</td><td>15.900</td><td>18.800</td><td>22.100</td><td>14.300</td><td>18.400</td><td><b>165.500</b></td></tr>
+                      <tr><td><i class="swatch swatch--s2"></i>2026</td><td>20.100</td><td>19.000</td><td>17.200</td><td>15.800</td><td>15.100</td><td>17.900</td><td>21.000</td><td>13.800</td><td>18.400</td><td><b>158.300</b></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
+          </article>
+
+          <div class="stack">
+            <!-- <ByDimension /> -->
+            <article class="card">
+              <header class="card__head"><div><h2 class="card__title">Per POD</h2><p class="card__sub">Gen – Set 2026</p></div></header>
+              <ul class="breakdown">
+                <li>
+                  <div class="breakdown__top"><b class="mono">IT001E12345678</b><span>104.200 kWh</span></div>
+                  <span class="breakdown__bar"><i style="--w:66%"></i></span>
+                  <small>Capannone produzione · 0,236 €/kWh</small>
+                </li>
+                <li>
+                  <div class="breakdown__top"><b class="mono">IT001E87654321</b><span>54.100 kWh</span></div>
+                  <span class="breakdown__bar"><i style="--w:34%"></i></span>
+                  <small>Uffici · 0,251 €/kWh</small>
+                </li>
+              </ul>
+            </article>
+
+            <!-- <FleetEfficiency /> -->
+            <article class="card">
+              <header class="card__head"><div><h2 class="card__title">Flotta · consumo medio</h2><p class="card__sub">L/100 km · calcolato da litri e km</p></div></header>
+              <ul class="hbars">
+                <li><span class="mono">DK 554 PL</span><span class="hbars__track"><i style="--w:88%"></i></span><b>13,2</b></li>
+                <li><span class="mono">FB 217 TR</span><span class="hbars__track"><i style="--w:76%"></i></span><b>11,4</b></li>
+                <li><span class="mono">GH 482 KL</span><span class="hbars__track"><i style="--w:59%"></i></span><b>8,9</b></li>
+                <li><span class="mono">EZ 903 MN</span><span class="hbars__track"><i style="--w:51%"></i></span><b>7,6</b></li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 7 — <Reports />
+           ============================================================ -->
+      <section class="view" id="report" aria-label="Report ed export">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Output</p>
+            <h1 class="view__title">Report ed export</h1>
+            <p class="view__sub">Documenti pronti per l'audit, con i dati isolati per il modulo scelto.</p>
+          </div>
+        </div>
+
+        <div class="layout layout--side-main">
+          <!-- <ScopeForm /> -->
+          <article class="card">
+            <header class="card__head"><div><h2 class="card__title">Ambito del report</h2></div></header>
+            <div class="card__body form">
+              <label class="field">
+                <span class="field__label">Modulo</span>
+                <span class="field__input field__input--select"><svg class="icon icon--sm"><use href="#i-bolt"/></svg>Energia &amp; Utenze<svg class="icon icon--xs"><use href="#i-down"/></svg></span>
+              </label>
+              <div class="field">
+                <span class="field__label">Tipi di documento</span>
+                <div class="checks">
+                  <span class="check is-on"><span class="checkbox is-on"></span>Fatture e bollette elettriche</span>
+                </div>
+              </div>
+              <label class="field">
+                <span class="field__label">Periodo</span>
+                <span class="field__input field__input--select"><svg class="icon icon--sm"><use href="#i-calendar"/></svg>01/01/2026 – 30/09/2026<svg class="icon icon--xs"><use href="#i-down"/></svg></span>
+              </label>
+              <div class="field">
+                <span class="field__label">Includi</span>
+                <div class="checks">
+                  <span class="check is-on"><span class="checkbox is-on"></span>Trend e analisi consumi</span>
+                  <span class="check is-on"><span class="checkbox is-on"></span>Radar scadenze</span>
+                  <span class="check"><span class="checkbox"></span>Campi incerti (con nota)</span>
+                </div>
+              </div>
+              <div class="scope-summary">
+                <b>18 documenti · 18 record</b>
+                <small>Tutti i campi verificati, nessun campo mancante</small>
+              </div>
+            </div>
+          </article>
+
+          <div class="stack">
+            <!-- <ExportFormats /> -->
+            <div class="formats">
+              <article class="format">
+                <div class="format__preview format__preview--xlsx" aria-hidden="true">
+                  <div class="xl">
+                    <div class="xl__kpis"><i></i><i></i><i></i></div>
+                    <div class="xl__rows"><i></i><i></i><i></i><i></i><i></i></div>
+                    <div class="xl__tabs"><span class="is-on">Cruscotto</span><span>Registro</span><span>Radar</span><span>Trend</span></div>
+                  </div>
+                </div>
+                <div class="format__body">
+                  <div class="format__title"><span class="ftype ftype--xlsx">XLSX</span><h3>Cartella di lavoro Excel</h3></div>
+                  <ul class="format__list">
+                    <li>Cruscotto KPI con formattazione condizionale</li>
+                    <li>Registro documenti e radar scadenze</li>
+                    <li>Fogli analitici e "Trend &amp; Analisi Consumi"</li>
+                  </ul>
+                  <button class="btn btn--primary btn--block" type="button"><svg class="icon icon--sm"><use href="#i-download"/></svg>Genera Excel</button>
+                </div>
+              </article>
+
+              <article class="format">
+                <div class="format__preview format__preview--docx" aria-hidden="true">
+                  <div class="wd">
+                    <span class="wd__title"></span>
+                    <span class="wd__ln"></span><span class="wd__ln wd__ln--s"></span>
+                    <span class="wd__table"></span>
+                    <span class="wd__ln"></span>
+                    <span class="wd__sign"><i></i><i></i></span>
+                  </div>
+                </div>
+                <div class="format__body">
+                  <div class="format__title"><span class="ftype ftype--docx">DOCX</span><h3>Relazione Word</h3></div>
+                  <ul class="format__list">
+                    <li>Nota metodologica e tabelle strutturate</li>
+                    <li>Sezione trend con grafici</li>
+                    <li>Blocco firme dal profilo aziendale</li>
+                  </ul>
+                  <button class="btn btn--secondary btn--block" type="button"><svg class="icon icon--sm"><use href="#i-download"/></svg>Genera Word</button>
+                </div>
+              </article>
+            </div>
+
+            <!-- <SignOff /> -->
+            <article class="card">
+              <header class="card__head"><div><h2 class="card__title">Firme del report</h2><p class="card__sub">Dal profilo aziendale · modificabili in Impostazioni</p></div></header>
+              <div class="card__body signoff">
+                <div class="signoff__box"><small>Verificato da (Energy Manager)</small><b>Ing. Luca Conti</b><span class="signoff__line"></span></div>
+                <div class="signoff__box"><small>Approvato da (Direzione aziendale)</small><b>Ecoservizi Nord S.r.l.</b><span class="signoff__line"></span></div>
+              </div>
+            </article>
+
+            <!-- <ExportHistory /> -->
+            <article class="card card--flush">
+              <header class="card__head card__head--pad"><div><h2 class="card__title">Export recenti</h2></div></header>
+              <div class="table-wrap">
+                <table class="table">
+                  <tbody>
+                    <tr><td><div class="doc"><span class="ftype ftype--xlsx">XLSX</span><div><b>Energia_2026_Q3.xlsx</b><small>Energia &amp; Utenze · 18 documenti</small></div></div></td><td class="muted">20/10/2026 · G. Ferri</td><td><button class="icon-btn" type="button" aria-label="Scarica"><svg class="icon icon--sm"><use href="#i-download"/></svg></button></td></tr>
+                    <tr><td><div class="doc"><span class="ftype ftype--docx">DOCX</span><div><b>Audit_ISO14001_2026.docx</b><small>Sistemi integrati · 46 documenti</small></div></div></td><td class="muted">12/10/2026 · G. Ferri</td><td><button class="icon-btn" type="button" aria-label="Scarica"><svg class="icon icon--sm"><use href="#i-download"/></svg></button></td></tr>
+                    <tr><td><div class="doc"><span class="ftype ftype--xlsx">XLSX</span><div><b>Formazione_settembre.xlsx</b><small>Formazione · 21 documenti</small></div></div></td><td class="muted">30/09/2026 · L. Conti</td><td><button class="icon-btn" type="button" aria-label="Scarica"><svg class="icon icon--sm"><use href="#i-download"/></svg></button></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           VIEW 8 — <Settings />
+           ============================================================ -->
+      <section class="view" id="impostazioni" aria-label="Impostazioni">
+        <div class="view__head">
+          <div>
+            <p class="view__eyebrow">Configurazione</p>
+            <h1 class="view__title">Impostazioni</h1>
+            <p class="view__sub">Profilo aziendale, destinatari degli alert, moduli e trattamento dei dati.</p>
+          </div>
+          <div class="view__actions"><button class="btn btn--primary" type="button"><svg class="icon icon--sm"><use href="#i-check"/></svg>Salva modifiche</button></div>
+        </div>
+
+        <div class="layout layout--1-1">
+          <article class="card">
+            <header class="card__head"><div><h2 class="card__title">Profilo aziendale</h2><p class="card__sub">Usato nelle intestazioni e nelle firme dei report</p></div></header>
+            <div class="card__body form form--2">
+              <label class="field"><span class="field__label">Ragione sociale</span><span class="field__input"><input type="text" value="Ecoservizi Nord S.r.l." /></span></label>
+              <label class="field"><span class="field__label">Partita IVA</span><span class="field__input"><input type="text" value="IT 01234567890" /></span></label>
+              <label class="field field--full"><span class="field__label">Sede</span><span class="field__input"><input type="text" value="Via dell'Industria 14, 24040 Bergamo (BG)" /></span></label>
+              <label class="field"><span class="field__label">Direttore tecnico</span><span class="field__input"><input type="text" value="Ing. Luca Conti" /></span></label>
+              <label class="field"><span class="field__label">RSGA</span><span class="field__input"><input type="text" value="Giulia Ferri" /></span></label>
+            </div>
+          </article>
+
+          <article class="card card--flush">
+            <header class="card__head card__head--pad">
+              <div><h2 class="card__title">Destinatari degli alert</h2></div>
+              <button class="btn btn--ghost btn--sm" type="button"><svg class="icon icon--sm"><use href="#i-plus"/></svg>Aggiungi</button>
+            </header>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Ruolo</th><th>Contatto</th><th>Canali</th></tr></thead>
+                <tbody>
+                  <tr><td><b>RSPP</b><br><small class="muted">Marta Gatti</small></td><td class="muted">m.gatti@ecoservizi.example</td><td><span class="tag tag--on">Email</span> <span class="tag tag--on">SMS</span></td></tr>
+                  <tr><td><b>RSGA</b><br><small class="muted">Giulia Ferri</small></td><td class="muted">g.ferri@ecoservizi.example</td><td><span class="tag tag--on">Email</span> <span class="tag">SMS</span></td></tr>
+                  <tr><td><b>Resp. flotta</b><br><small class="muted">Davide Russo</small></td><td class="muted">d.russo@ecoservizi.example</td><td><span class="tag tag--on">Email</span> <span class="tag">SMS</span></td></tr>
+                  <tr><td><b>Amministrazione</b><br><small class="muted">Ufficio contabilità</small></td><td class="muted">amministrazione@ecoservizi.example</td><td><span class="tag tag--on">Email</span> <span class="tag">SMS</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card">
+            <header class="card__head"><div><h2 class="card__title">Moduli attivi</h2><p class="card__sub">Ogni modulo porta campi, scadenze e layout di report</p></div></header>
+            <ul class="toggles">
+              <li><span class="coverage__icon c-green"><svg class="icon icon--xs"><use href="#i-leaf"/></svg></span><div><b>Sistemi integrati ISO 14001 / 9001 / 45001</b><small>5 tipi di documento</small></div><span class="switch is-on"></span></li>
+              <li><span class="coverage__icon c-amber"><svg class="icon icon--xs"><use href="#i-bolt"/></svg></span><div><b>Energia &amp; Utenze</b><small>Bollette elettriche</small></div><span class="switch is-on"></span></li>
+              <li><span class="coverage__icon c-violet"><svg class="icon icon--xs"><use href="#i-cap"/></svg></span><div><b>Risorse Umane — Formazione</b><small>Attestati, scadenze calcolate</small></div><span class="switch is-on"></span></li>
+              <li><span class="coverage__icon c-blue"><svg class="icon icon--xs"><use href="#i-truck"/></svg></span><div><b>Flotta — Carburante</b><small>Rifornimenti, L/100 km</small></div><span class="switch is-on"></span></li>
+              <li><span class="coverage__icon c-rose"><svg class="icon icon--xs"><use href="#i-wrench"/></svg></span><div><b>Macchinari &amp; Asset</b><small>Interventi e verifiche</small></div><span class="switch is-on"></span></li>
+              <li><span class="coverage__icon c-slate"><svg class="icon icon--xs"><use href="#i-folder"/></svg></span><div><b>Documenti generali e contratti</b><small>Protocolli, enti, scadenze</small></div><span class="switch is-on"></span></li>
+            </ul>
+          </article>
+
+          <article class="card privacy">
+            <header class="card__head"><div><h2 class="card__title">Elaborazione e privacy</h2><p class="card__sub">Dove vengono elaborati i tuoi documenti</p></div></header>
+            <div class="card__body">
+              <div class="deploy">
+                <div class="deploy__opt is-on">
+                  <span class="deploy__icon"><svg class="icon icon--sm"><use href="#i-cpu"/></svg></span>
+                  <div><b>Modello AI in cloud</b><small>Configurazione attuale</small></div>
+                  <span class="radio is-on"></span>
+                </div>
+                <div class="deploy__opt is-soon">
+                  <span class="deploy__icon"><svg class="icon icon--sm"><use href="#i-lock"/></svg></span>
+                  <div><b>Completamente on-premise</b><small>Modelli locali, nessun dato in uscita</small></div>
+                  <span class="tag">In arrivo</span>
+                </div>
+              </div>
+              <ul class="checklist">
+                <li><svg class="icon icon--xs"><use href="#i-check"/></svg>Archivio dei documenti e database su server aziendale</li>
+                <li><svg class="icon icon--xs"><use href="#i-check"/></svg>Calcoli e scadenze eseguiti in locale, senza IA</li>
+                <li><svg class="icon icon--xs"><use href="#i-check"/></svg>Chiavi e credenziali gestite tramite variabili d'ambiente</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+</body>
+</html>
